@@ -1,4 +1,4 @@
-const BASE = "/api/users";
+const BASE = `${import.meta.env.VITE_API_BASE_URL || ""}/api/users`;
 
 export const getUsers = async (search = "") => {
   const url = search ? `${BASE}/?search=${encodeURIComponent(search)}` : `${BASE}/`;
@@ -44,7 +44,7 @@ export const createUser = async (data) => {
 };
 
 export const getUserHealthProfile = async (userId) => {
-  const res = await fetch(`/api/users/${userId}/health-profile/`);
+  const res = await fetch(`${import.meta.env.VITE_API_BASE_URL || ""}/api/users/${userId}/health-profile/`);
   if (!res.ok) throw new Error("Profile not found");
   return res.json();
 };

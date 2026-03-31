@@ -1,5 +1,5 @@
-const USAGE_BASE = "/api/subscription/usage";
-const ANALYTICS_BASE = "/api/subscription/payments/analytics";
+const USAGE_BASE = `${import.meta.env.VITE_API_BASE_URL || ""}/api/subscription/usage`;
+const ANALYTICS_BASE = `${import.meta.env.VITE_API_BASE_URL || ""}/api/subscription/payments/analytics`;
 
 export const getPayments = async (params = {}) => {
   const query = new URLSearchParams(params).toString();

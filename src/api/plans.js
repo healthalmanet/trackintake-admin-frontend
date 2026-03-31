@@ -1,4 +1,4 @@
-const BASE = "/api/subscription/plans";
+const BASE = `${import.meta.env.VITE_API_BASE_URL || ""}/api/subscription/plans`;
 
 export const getPlans = async () => {
   const res = await fetch(`${BASE}/`);
