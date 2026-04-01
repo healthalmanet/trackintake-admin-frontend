@@ -63,7 +63,7 @@ export default function App() {
 
   return (
     <div className="flex h-screen bg-gray-50 overflow-hidden">
-      <Sidebar active={activePage} onNavigate={setActivePage} />
+      <Sidebar active={activePage} onNavigate={setActivePage} onLogout={handleLogout} />
       <div className="flex-1 flex flex-col overflow-hidden">
         <Navbar onLogout={() => setIsLoggedIn(false)} />
         <main className="flex-1 overflow-y-auto">
