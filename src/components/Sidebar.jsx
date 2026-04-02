@@ -26,7 +26,7 @@ const navItems = [
   { icon: Settings, label: "Settings", id: "settings" },
 ];
 
-export default function Sidebar({ active, onNavigate, onLogout }) {
+export default function Sidebar({ active, onNavigate }) {
   return (
     <aside className="w-56 min-h-screen bg-white border-r border-gray-100 flex flex-col shadow-sm">
       {/* Logo */}
@@ -57,13 +57,7 @@ export default function Sidebar({ active, onNavigate, onLogout }) {
         })}
       </nav>
 
-      {/* Logout */}
-      <div className="px-3 py-4 border-t border-gray-100">
-        <button onClick={onLogout} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-gray-500 hover:bg-red-50 hover:text-red-500 transition-all duration-150 cursor-pointer">
-          <LogOut size={17} />
-          Logout
-        </button>
-      </div>
+      {/* Logout removed */}
     </aside>
   );
 }

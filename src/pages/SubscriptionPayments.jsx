@@ -63,7 +63,7 @@ export default function SubscriptionPayments({ pageState = {} }) {
     return () => clearTimeout(handler);
   }, [search]);
 
-  // Fetch Plans mapping for the Chart
+  //  Plans mapping for the Chart
   useEffect(() => {
     const fetchPlans = async () => {
       try {
@@ -81,7 +81,7 @@ export default function SubscriptionPayments({ pageState = {} }) {
     fetchPlans();
   }, []);
 
-  // Fetch Payments (Usage)
+  //  Payments (Usage)
   const loadPayments = useCallback(async () => {
     setLoading(true);
     try {

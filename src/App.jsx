@@ -5,7 +5,6 @@ import Dashboard from "./pages/Dashboard";
 import UserManagement from "./pages/UserManagement";
 import SubscriptionPlans from "./pages/SubscriptionPlans";
 import SubscriptionPayments from "./pages/SubscriptionPayments";
-import Login from "./pages/Login";
 
 function PlaceholderPage({ title }) {
   return (
@@ -34,19 +33,8 @@ const getPage = (activePage, pageState) => {
 };
 
 export default function App() {
-  const [isLoggedIn, setIsLoggedIn] = useState(() => localStorage.getItem("isLoggedIn") === "true");
   const [activePage, setActivePage] = useState("dashboard");
   const [pageState, setPageState] = useState({});
-
-  const handleLogin = () => {
-    localStorage.setItem("isLoggedIn", "true");
-    setIsLoggedIn(true);
-  };
-
-  const handleLogout = () => {
-    localStorage.removeItem("isLoggedIn");
-    setIsLoggedIn(false);
-  };
 
   useEffect(() => {
     const handleNav = (e) => {
@@ -57,15 +45,11 @@ export default function App() {
     return () => window.removeEventListener("app-nav", handleNav);
   }, []);
 
-  if (!isLoggedIn) {
-    return <Login onLogin={handleLogin} />;
-  }
-
   return (
     <div className="flex h-screen bg-gray-50 overflow-hidden">
-      <Sidebar active={activePage} onNavigate={setActivePage} onLogout={handleLogout} />
+      <Sidebar active={activePage} onNavigate={setActivePage} />
       <div className="flex-1 flex flex-col overflow-hidden">
-        <Navbar onLogout={() => setIsLoggedIn(false)} />
+        <Navbar />
         <main className="flex-1 overflow-y-auto">
           {getPage(activePage, pageState)}
         </main>
