@@ -1,4 +1,4 @@
-const BASE = "/api/dashboard";
+const BASE = `${import.meta.env.VITE_API_BASE_URL || ""}/api/dashboard`;
 
 const fetchJSON = async (url) => {
   const res = await fetch(url);
@@ -7,7 +7,7 @@ const fetchJSON = async (url) => {
 };
 
 export const getDashboardStats = async ({ range, date } = {}) => {
-  // Build query params based on range type
+  //  query params based on range type
   let params = "";
   if (range === "day" && date) {
     params = `?date=${date}`;

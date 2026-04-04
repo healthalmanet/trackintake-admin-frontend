@@ -65,10 +65,10 @@ const CustomDot = ({ cx, cy, fill }) => <circle cx={cx} cy={cy} r={4.5} fill={fi
 export default function Dashboard({ pageState }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [timeRange, setTimeRange] = useState("month");
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split("T")[0]);
-  const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7));
-  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear().toString());
+  const [timeRange, setTimeRange] = useState(() => localStorage.getItem("dash_range") || "month");
+  const [selectedDate, setSelectedDate] = useState(() => localStorage.getItem("dash_date") || new Date().toISOString().split("T")[0]);
+  const [selectedMonth, setSelectedMonth] = useState(() => localStorage.getItem("dash_month") || new Date().toISOString().slice(0, 7));
+  const [selectedYear, setSelectedYear] = useState(() => localStorage.getItem("dash_year") || new Date().getFullYear().toString());
 
   useEffect(() => {
     setLoading(true);
@@ -77,7 +77,7 @@ export default function Dashboard({ pageState }) {
     if (timeRange === "month") apiDate = selectedMonth;
     if (timeRange === "year") apiDate = selectedYear;
 
-    // Assuming backend takes ?timeRange=... and optional ?date=...
+    // # Assuming backend takes ?timeRange and optional ?date
     getDashboardStats({ range: timeRange, date: apiDate })
       .then((res) => {
         setData({
@@ -138,7 +138,7 @@ export default function Dashboard({ pageState }) {
 
   return (
     <div className="p-6 space-y-6 bg-[#fafafa] min-h-full">
-      {/* Header & Global Filters */}
+      {/* Header & Filters */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold text-gray-900 tracking-tight">Dashboard Overview</h1>
@@ -158,7 +158,7 @@ export default function Dashboard({ pageState }) {
             <input 
               type="date" 
               value={selectedDate}
-              onChange={(e) => setSelectedDate(e.target.value)}
+              onChange={(e) => { setSelectedDate(e.target.value); localStorage.setItem("dash_date", e.target.value); }}
               className="px-3 py-2 text-sm bg-white border border-gray-200 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-300 transition-all font-medium text-gray-700"
             />
           )}
@@ -166,7 +166,7 @@ export default function Dashboard({ pageState }) {
             <input 
               type="month" 
               value={selectedMonth}
-              onChange={(e) => setSelectedMonth(e.target.value)}
+              onChange={(e) => { setSelectedMonth(e.target.value); localStorage.setItem("dash_month", e.target.value); }}
               className="px-3 py-2 text-sm bg-white border border-gray-200 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-300 transition-all font-medium text-gray-700"
             />
           )}
@@ -175,14 +175,14 @@ export default function Dashboard({ pageState }) {
               type="number" 
               min="2020" max="2100"
               value={selectedYear}
-              onChange={(e) => setSelectedYear(e.target.value)}
+              onChange={(e) => { setSelectedYear(e.target.value); localStorage.setItem("dash_year", e.target.value); }}
               className="px-3 py-2 text-sm bg-white border border-gray-200 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-300 transition-all font-medium text-gray-700 w-24"
             />
           )}
           <div className="relative">
             <select 
               value={timeRange}
-              onChange={(e) => setTimeRange(e.target.value)}
+              onChange={(e) => { setTimeRange(e.target.value); localStorage.setItem("dash_range", e.target.value); }}
               className="appearance-none px-4 py-2 text-sm font-semibold text-gray-700 bg-white border border-gray-200 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-300 transition-all cursor-pointer pr-10"
             >
               <option value="day">Date</option>

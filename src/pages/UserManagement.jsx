@@ -39,8 +39,7 @@ export default function UserManagement({ pageState = {} }) {
     setLoading(true);
     setError("");
     try {
-      // Backend only takes 'search' param right now for full_name/email, 
-      // other filters will be applied locally on the fetched dataset.
+     
       const data = await api.getUsers(); 
       const userList = Array.isArray(data) ? data : (data.results || []);
       setUsers(userList);
@@ -90,11 +89,10 @@ export default function UserManagement({ pageState = {} }) {
         (u.full_name || "").toLowerCase().includes(lowerSearch) || 
         (u.email || "").toLowerCase().includes(lowerSearch);
         
-      // 2. City Filter (assuming city might be in health profile, but if it's on the user object we map it)
-      // Since 'city' isn't explicitly returned from getUsers always, we match loosely
+      // 2. City Filter 
       const matchCity = !cityFilter || (u.city || "").toLowerCase().includes(cityFilter.toLowerCase());
 
-      // 3. Date Filter (exact date match)
+      // 3. Date Filter 
       const matchDate = !dateFilter || (u.date_joined && u.date_joined.startsWith(dateFilter));
 
       // 4. Plan & Status

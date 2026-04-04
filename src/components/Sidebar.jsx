@@ -57,13 +57,7 @@ export default function Sidebar({ active, onNavigate }) {
         })}
       </nav>
 
-      {/* Logout */}
-      <div className="px-3 py-4 border-t border-gray-100">
-        <button className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-gray-500 hover:bg-red-50 hover:text-red-500 transition-all duration-150 cursor-pointer">
-          <LogOut size={17} />
-          Logout
-        </button>
-      </div>
+      {/* Logout removed */}
     </aside>
   );
 }
