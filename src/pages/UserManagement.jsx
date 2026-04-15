@@ -1,8 +1,11 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { Search, Eye, Pencil, ChevronDown, Loader2, X, MapPin, Calendar, CheckCircle, XCircle } from "lucide-react";
 import * as api from "../api/users";
+import { getPlans } from "../api/plans";
+import { TEST_USERS, TEST_PLANS } from "../testData";
 
-const PLANS = ["All", "Basic", "Hero", "Silver", "Free"];
+const USE_TEST_DATA = true;
+
 const STATUSES = ["All", "Active", "Inactive"];
 
 const planColors = {
@@ -17,14 +20,15 @@ export default function UserManagement({ pageState = {} }) {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [planOptions, setPlanOptions] = useState(["All"]);
   
   // Filters
   const [search, setSearch] = useState("");
   const [cityFilter, setCityFilter] = useState("");
   const [dateFilter, setDateFilter] = useState(pageState.dateFilter || "");
-  const [dateFilterMode, setDateFilterMode] = useState(pageState.dateFilterMode || "date");
+  const [dateFilterMode, setDateFilterMode] = useState("date");
   const [planFilter, setPlanFilter] = useState("All");
-  const [statusFilter, setStatusFilter] = useState(pageState.statusFilter || "All");
+  const [statusFilter, setStatusFilter] = useState("All");
   
   // Modals
   const [modal, setModal] = useState(null);
@@ -39,8 +43,12 @@ export default function UserManagement({ pageState = {} }) {
     setLoading(true);
     setError("");
     try {
-     
-      const data = await api.getUsers(); 
+      if (USE_TEST_DATA) {
+        setUsers(TEST_USERS);
+        setLoading(false);
+        return;
+      }
+      const data = await api.getUsers();
       const userList = Array.isArray(data) ? data : (data.results || []);
       setUsers(userList);
     } catch (err) {
@@ -53,6 +61,20 @@ export default function UserManagement({ pageState = {} }) {
   useEffect(() => {
     fetchUsers();
   }, [fetchUsers]);
+
+  useEffect(() => {
+    if (USE_TEST_DATA) {
+      const active = TEST_PLANS.filter((p) => p.is_active).map((p) => p.name);
+      setPlanOptions(["All", ...active]);
+      return;
+    }
+    getPlans().then((data) => {
+      const active = (Array.isArray(data) ? data : data.results || [])
+        .filter((p) => p.is_active)
+        .map((p) => p.name);
+      setPlanOptions(["All", ...active]);
+    }).catch(() => {});
+  }, []);
 
   const handleToggleActive = async (user) => {
     setTogglingId(user.id);
@@ -193,7 +215,7 @@ export default function UserManagement({ pageState = {} }) {
           </div>
 
           {[
-            { label: "Plan", options: PLANS, value: planFilter, set: setPlanFilter },
+            { label: "Plan", options: planOptions, value: planFilter, set: setPlanFilter },
             { label: "Status", options: STATUSES, value: statusFilter, set: setStatusFilter },
           ].map(({ label, options, value, set }) => (
             <div key={label} className="relative min-w-[120px]">

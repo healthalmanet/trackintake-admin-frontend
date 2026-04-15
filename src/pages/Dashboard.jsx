@@ -8,6 +8,9 @@ import {
   BarChart, Bar, Cell, PieChart, Pie, AreaChart, Area, CartesianGrid
 } from "recharts";
 import { getDashboardStats } from "../api/dashboard";
+import { getDashboardTestData } from "../testData";
+
+const USE_TEST_DATA = true;
 
 const PLAN_COLORS = { Free: "#9ca3af", Basic: "#3b82f6", Hero: "#f97316", Silver: "#a855f7" };
 const MEAL_COLORS = ["#f97316", "#3b82f6", "#22c55e", "#eab308", "#a855f7"];
@@ -65,13 +68,41 @@ const CustomDot = ({ cx, cy, fill }) => <circle cx={cx} cy={cy} r={4.5} fill={fi
 export default function Dashboard({ pageState }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [timeRange, setTimeRange] = useState(() => localStorage.getItem("dash_range") || "month");
-  const [selectedDate, setSelectedDate] = useState(() => localStorage.getItem("dash_date") || new Date().toISOString().split("T")[0]);
-  const [selectedMonth, setSelectedMonth] = useState(() => localStorage.getItem("dash_month") || new Date().toISOString().slice(0, 7));
-  const [selectedYear, setSelectedYear] = useState(() => localStorage.getItem("dash_year") || new Date().getFullYear().toString());
+  const [timeRange, setTimeRange] = useState(() => sessionStorage.getItem("dash_range") || "month");
+  const [selectedDate, setSelectedDate] = useState(() => sessionStorage.getItem("dash_date") || new Date().toISOString().split("T")[0]);
+  const [selectedMonth, setSelectedMonth] = useState(() => sessionStorage.getItem("dash_month") || new Date().toISOString().slice(0, 7));
+  const [selectedYear, setSelectedYear] = useState(() => sessionStorage.getItem("dash_year") || new Date().getFullYear().toString());
 
   useEffect(() => {
     setLoading(true);
+
+    if (USE_TEST_DATA) {
+      let apiDate = undefined;
+      if (timeRange === "day") apiDate = selectedDate;
+      if (timeRange === "month") apiDate = selectedMonth;
+      if (timeRange === "year") apiDate = selectedYear;
+      const res = getDashboardTestData(timeRange, apiDate);
+      setData({
+        totalUsers: res.totalUsers,
+        activeUsers: res.activeUsers,
+        totalRevenue: res.totalRevenue ?? 0,
+        revenueByPlan: res.revenueByPlan ?? [],
+        pendingAppts: res.pendingAppts ?? 0,
+        growthData: res.userGrowth?.length ? res.userGrowth : [],
+        revenueTrend: res.revenueTrend?.length ? res.revenueTrend : [],
+        planDist: (res.planDistribution ?? []).map((p) => ({
+          name: p.plan || p.plan_id || "Unknown",
+          value: p.users ?? p.count ?? 0,
+          pct: res.totalUsers ? Math.round(((p.users ?? p.count ?? 0) / res.totalUsers) * 100) : 0,
+          color: PLAN_COLORS[p.plan] ?? PLAN_COLORS[p.plan_id] ?? "#9ca3af",
+        })),
+        mealCats: res.mealCats?.length ? res.mealCats : [],
+        activity: formatActivity(res.recentActivity || []),
+      });
+      setLoading(false);
+      return;
+    }
+
     let apiDate = undefined;
     if (timeRange === "day") apiDate = selectedDate;
     if (timeRange === "month") apiDate = selectedMonth;
@@ -158,7 +189,7 @@ export default function Dashboard({ pageState }) {
             <input 
               type="date" 
               value={selectedDate}
-              onChange={(e) => { setSelectedDate(e.target.value); localStorage.setItem("dash_date", e.target.value); }}
+              onChange={(e) => { setSelectedDate(e.target.value); sessionStorage.setItem("dash_date", e.target.value); }}
               className="px-3 py-2 text-sm bg-white border border-gray-200 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-300 transition-all font-medium text-gray-700"
             />
           )}
@@ -166,7 +197,7 @@ export default function Dashboard({ pageState }) {
             <input 
               type="month" 
               value={selectedMonth}
-              onChange={(e) => { setSelectedMonth(e.target.value); localStorage.setItem("dash_month", e.target.value); }}
+              onChange={(e) => { setSelectedMonth(e.target.value); sessionStorage.setItem("dash_month", e.target.value); }}
               className="px-3 py-2 text-sm bg-white border border-gray-200 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-300 transition-all font-medium text-gray-700"
             />
           )}
@@ -175,14 +206,14 @@ export default function Dashboard({ pageState }) {
               type="number" 
               min="2020" max="2100"
               value={selectedYear}
-              onChange={(e) => { setSelectedYear(e.target.value); localStorage.setItem("dash_year", e.target.value); }}
+              onChange={(e) => { setSelectedYear(e.target.value); sessionStorage.setItem("dash_year", e.target.value); }}
               className="px-3 py-2 text-sm bg-white border border-gray-200 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-300 transition-all font-medium text-gray-700 w-24"
             />
           )}
           <div className="relative">
             <select 
               value={timeRange}
-              onChange={(e) => { setTimeRange(e.target.value); localStorage.setItem("dash_range", e.target.value); }}
+              onChange={(e) => { setTimeRange(e.target.value); sessionStorage.setItem("dash_range", e.target.value); }}
               className="appearance-none px-4 py-2 text-sm font-semibold text-gray-700 bg-white border border-gray-200 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-300 transition-all cursor-pointer pr-10"
             >
               <option value="day">Date</option>

@@ -1,6 +1,6 @@
 import { Search, Bell, ChevronDown } from "lucide-react";
 
-export default function Navbar({ onLogout }) {
+export default function Navbar({ unreadCount = 0, onNotificationClick }) {
   return (
     <header className="h-14 bg-white border-b border-gray-100 flex items-center px-6 gap-4 shadow-sm">
       {/* Search */}
@@ -15,9 +15,11 @@ export default function Navbar({ onLogout }) {
 
       <div className="flex items-center gap-3 ml-auto">
         {/* Notification */}
-        <button className="relative p-2 rounded-lg hover:bg-gray-50 transition cursor-pointer">
+        <button onClick={onNotificationClick} className="relative p-2 rounded-lg hover:bg-gray-50 transition cursor-pointer">
           <Bell size={18} className="text-gray-500" />
-          <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-orange-500 rounded-full"></span>
+          {unreadCount > 0 && (
+            <span className="absolute -top-1 -right-1 w-4 h-4 bg-orange-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">{unreadCount}</span>
+          )}
         </button>
 
         {/* Profile */}

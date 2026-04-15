@@ -8,13 +8,14 @@ import {
   BookOpen,
   Bell,
   Settings,
-  LogOut,
   CreditCard,
+  Stethoscope,
 } from "lucide-react";
 
 const navItems = [
   { icon: LayoutDashboard, label: "Dashboard", id: "dashboard" },
   { icon: Users, label: "User Management", id: "users" },
+  { icon: Stethoscope, label: "Nutritionists", id: "nutritionists" },
   { icon: CreditCard, label: "Subscription Plans", id: "plans" },
   { icon: CreditCard, label: "Subscription Payments", id: "payments" },
   { icon: UtensilsCrossed, label: "Meals", id: "meals" },

@@ -7,6 +7,9 @@ import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell
 } from "recharts";
 import { getPayments, getPaymentAnalytics } from "../api/payments";
+import { getPaymentsTestData } from "../testData";
+
+const USE_TEST_DATA = true;
 
 const PLAN_COLORS = { 
   Basic: "bg-blue-50 text-blue-600", 
@@ -85,10 +88,22 @@ export default function SubscriptionPayments({ pageState = {} }) {
   const loadPayments = useCallback(async () => {
     setLoading(true);
     try {
+      if (USE_TEST_DATA) {
+        let apiDate = undefined;
+        if (timeRange === "date") apiDate = selectedDate;
+        if (timeRange === "month") apiDate = selectedMonth;
+        if (timeRange === "year") apiDate = selectedYear;
+        const { payments, analytics: a } = getPaymentsTestData(timeRange, apiDate, statusFilter, debouncedSearch);
+        setPayments(payments.results);
+        setTotalPages(payments.total_pages);
+        setTotalCount(payments.total);
+        setAnalytics(a);
+        setLoading(false);
+        return;
+      }
       const params = { page, page_size: 10 };
       if (debouncedSearch) params.search = debouncedSearch;
       if (statusFilter !== "all") params.status = statusFilter;
-      
       if (timeRange === "date") params.date = selectedDate;
       if (timeRange === "month") {
         const parts = selectedMonth.split("-");
@@ -96,7 +111,6 @@ export default function SubscriptionPayments({ pageState = {} }) {
         params.month = parts[1];
       }
       if (timeRange === "year") params.year = selectedYear;
-      
       const data = await getPayments(params);
       setPayments(data.results || []);
       setTotalPages(data.total_pages || 1);
@@ -114,22 +128,7 @@ export default function SubscriptionPayments({ pageState = {} }) {
   }, [loadPayments]);
 
   // Fetch Analytics
-  useEffect(() => {
-    const loadAnalytics = async () => {
-      try {
-        let apiDate = undefined;
-        if (timeRange === "date") apiDate = selectedDate;
-        if (timeRange === "month") apiDate = selectedMonth;
-        if (timeRange === "year") apiDate = selectedYear;
-
-        const data = await getPaymentAnalytics({ filter: timeRange, date: apiDate });
-        setAnalytics(data);
-      } catch (err) {
-        console.error("Failed to fetch analytics:", err);
-      }
-    };
-    loadAnalytics();
-  }, [timeRange, selectedDate, selectedMonth, selectedYear]);
+  // Analytics handled inside loadPayments for test data
 
   // Transform chart data mapping plan_id to name
   const chartData = (analytics.revenuePerPlan || []).map(p => ({
