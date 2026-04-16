@@ -19,13 +19,15 @@ const PLAN_COLORS = {
 const STATUS_ICONS = {
   success: <CheckCircle size={11} />,
   pending: <Clock size={11} />,
-  failed: <XCircle size={11} />
+  failed: <XCircle size={11} />,
+  free: <Clock size={11} />,
 };
 
 const STATUS_COLORS = {
   success: "bg-green-50 text-green-600",
   pending: "bg-yellow-50 text-yellow-600",
-  failed: "bg-red-50 text-red-600"
+  failed: "bg-red-50 text-red-600",
+  free: "bg-gray-100 text-gray-500",
 };
 
 export default function SubscriptionPayments({ pageState = {} }) {
@@ -85,29 +87,24 @@ export default function SubscriptionPayments({ pageState = {} }) {
   const loadPayments = useCallback(async () => {
     setLoading(true);
     try {
-      const params = { page, page_size: 10 };
-      if (debouncedSearch) params.search = debouncedSearch;
-      if (statusFilter !== "all") params.status = statusFilter;
-      
-      if (timeRange === "date") params.date = selectedDate;
-      if (timeRange === "month") {
-        const parts = selectedMonth.split("-");
-        params.year = parts[0];
-        params.month = parts[1];
+      const data = await getPayments();
+      // Backend returns flat array
+      let list = Array.isArray(data) ? data : [];
+      if (debouncedSearch) {
+        const q = debouncedSearch.toLowerCase();
+        list = list.filter(p => (p.user_name || "").toLowerCase().includes(q) || (p.email || "").toLowerCase().includes(q));
       }
-      if (timeRange === "year") params.year = selectedYear;
-      
-      const data = await getPayments(params);
-      setPayments(data.results || []);
-      setTotalPages(data.total_pages || 1);
-      setTotalCount(data.total || 0);
+      if (statusFilter !== "all") list = list.filter(p => (p.payment_status || "free").toLowerCase() === statusFilter);
+      setPayments(list);
+      setTotalPages(Math.ceil(list.length / 10) || 1);
+      setTotalCount(list.length);
     } catch (err) {
       console.error("Failed to fetch payments:", err);
       setPayments([]);
     } finally {
       setLoading(false);
     }
-  }, [debouncedSearch, statusFilter, page, timeRange, selectedDate, selectedMonth, selectedYear]);
+  }, [debouncedSearch, statusFilter]);
 
   useEffect(() => {
     loadPayments();
@@ -117,13 +114,22 @@ export default function SubscriptionPayments({ pageState = {} }) {
   useEffect(() => {
     const loadAnalytics = async () => {
       try {
-        let apiDate = undefined;
-        if (timeRange === "date") apiDate = selectedDate;
-        if (timeRange === "month") apiDate = selectedMonth;
-        if (timeRange === "year") apiDate = selectedYear;
-
-        const data = await getPaymentAnalytics({ filter: timeRange, date: apiDate });
-        setAnalytics(data);
+        const params = {};
+        if (timeRange === "date") params.date = selectedDate;
+        if (timeRange === "month") {
+          const [y, m] = selectedMonth.split("-");
+          params.year = y;
+          params.month = m;
+        }
+        if (timeRange === "year") params.year = selectedYear;
+        const data = await getPaymentAnalytics(params);
+        setAnalytics({
+          totalPayments: data.totalPayments || 0,
+          totalRevenue: data.totalRevenue || 0,
+          successPayments: data.successPayments || 0,
+          failedPayments: data.failedPayments || 0,
+          revenuePerPlan: data.revenuePerPlan || [],
+        });
       } catch (err) {
         console.error("Failed to fetch analytics:", err);
       }
@@ -193,6 +199,7 @@ export default function SubscriptionPayments({ pageState = {} }) {
               <option value="week">Weekly</option>
               <option value="month">Monthly</option>
               <option value="year">Year</option>
+              <option value="all">All Time</option>
             </select>
             <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none" />
           </div>
@@ -260,8 +267,8 @@ export default function SubscriptionPayments({ pageState = {} }) {
             className="appearance-none pl-4 pr-10 py-2 text-sm bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-300 cursor-pointer text-gray-700">
             <option value="all">Status: All</option>
             <option value="success">Success</option>
-            <option value="pending">Pending</option>
             <option value="failed">Failed</option>
+            <option value="pending">Pending</option>
           </select>
           <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
         </div>

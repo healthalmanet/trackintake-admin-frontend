@@ -76,6 +76,7 @@ export default function Dashboard({ pageState }) {
     if (timeRange === "day") apiDate = selectedDate;
     if (timeRange === "month") apiDate = selectedMonth;
     if (timeRange === "year") apiDate = selectedYear;
+    // timeRange === "all" → apiDate stays undefined → backend returns all-time data
 
     // Assuming backend takes ?timeRange=... and optional ?date=...
     getDashboardStats({ range: timeRange, date: apiDate })
@@ -147,7 +148,8 @@ export default function Dashboard({ pageState }) {
             <span className="text-sm text-gray-600 font-medium">
               {timeRange === "day" ? new Date(selectedDate).toLocaleDateString("en-US", { weekday: "long", day: "numeric", month: "long", year: "numeric" }) 
                : timeRange === "month" ? new Date(selectedMonth + "-01").toLocaleDateString("en-US", { month: "long", year: "numeric" })
-               : timeRange === "year" ? selectedYear 
+               : timeRange === "year" ? selectedYear
+               : timeRange === "all" ? "All Time"
                : today}
             </span>
           </div>
@@ -189,6 +191,7 @@ export default function Dashboard({ pageState }) {
               <option value="week">Weekly</option>
               <option value="month">Monthly</option>
               <option value="year">Yearly</option>
+              <option value="all">All Time</option>
             </select>
             <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none" />
           </div>
