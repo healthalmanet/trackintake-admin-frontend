@@ -1,15 +1,6 @@
 import {
-  LayoutDashboard,
-  Users,
-  UtensilsCrossed,
-  ClipboardList,
-  TrendingUp,
-  CalendarCheck,
-  BookOpen,
-  Bell,
-  Settings,
-  CreditCard,
-  Stethoscope,
+  LayoutDashboard, Users, UtensilsCrossed, ClipboardList,
+  TrendingUp, CalendarCheck, BookOpen, Bell, Settings, CreditCard, Stethoscope,
 } from "lucide-react";
 
 const navItems = [

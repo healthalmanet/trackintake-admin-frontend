@@ -18,12 +18,12 @@ function PlaceholderPage({ title }) {
 }
 
 export default function App() {
-  const [activePage, setActivePage] = useState(() => localStorage.getItem("activePage") || "dashboard");
+  const [activePage, setActivePage] = useState(() => sessionStorage.getItem("activePage") || "dashboard");
   const [pageState, setPageState] = useState({});
   const [unreadCount, setUnreadCount] = useState(4);
 
   const handleNavigate = (page) => {
-    localStorage.setItem("activePage", page);
+    sessionStorage.setItem("activePage", page);
     setActivePage(page);
   };
 

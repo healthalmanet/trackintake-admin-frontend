@@ -1,8 +1,9 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import {
   UserPlus, CreditCard, UserCheck, Clock3, Bell,
-  CheckCheck, Search, ChevronDown, X, Trash2, SlidersHorizontal
+  CheckCheck, Search, ChevronDown, X, Trash2, SlidersHorizontal, Loader2
 } from "lucide-react";
+import { getAdminNotifications } from "../api/notifications";
 
 const MOCK_DATA = [
   { id: 1, title: "New User Registration", message: "Aarav Sharma registered a new account.", type: "Registration", notif_type: "USER", user_id: 101, is_read: false, created_at: "2026-04-07T09:30:00Z" },
@@ -79,14 +80,9 @@ function NotificationCard({ n, onMarkRead }) {
         </div>
       </div>
       <div className="flex items-center gap-3 shrink-0">
-        <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase border tracking-wide ${cfg.badge}`}>
-          {n.type}
-        </span>
-        <button
-          onClick={() => !n.is_read && onMarkRead(n.id)}
-          title={n.is_read ? "Read" : "Mark as read"}
-          className={`transition cursor-pointer ${n.is_read ? "text-orange-400" : "text-gray-300 hover:text-orange-400"}`}
-        >
+        <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase border tracking-wide ${cfg.badge}`}>{n.type}</span>
+        <button onClick={() => !n.is_read && onMarkRead(n.id)} title={n.is_read ? "Read" : "Mark as read"}
+          className={`transition cursor-pointer ${n.is_read ? "text-orange-400" : "text-gray-300 hover:text-orange-400"}`}>
           <CheckCheck size={18} />
         </button>
       </div>
@@ -94,79 +90,35 @@ function NotificationCard({ n, onMarkRead }) {
   );
 }
 
-function FilterBar({ search, setSearch, typeFilter, setTypeFilter, statusFilter, setStatusFilter, dateFilter, setDateFilter, onClear, hasFilters }) {
-  return (
-    <div className="flex flex-wrap gap-3 items-center">
-      <div className="relative flex-1 min-w-[220px]">
-        <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-        <input type="text" placeholder="Search by title, message or user ID..."
-          value={search} onChange={(e) => setSearch(e.target.value)}
-          className="w-full pl-9 pr-4 py-2.5 text-sm bg-white border border-gray-200 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-300 transition" />
-      </div>
-      {[
-        { value: typeFilter, set: setTypeFilter, options: ["All Types", "Registration", "Plan Purchase", "Assignment", "Expiry"] },
-        { value: statusFilter, set: setStatusFilter, options: ["All", "Unread", "Read"] },
-      ].map(({ value, set, options }, i) => (
-        <div key={i} className="relative">
-          <select value={value} onChange={(e) => set(e.target.value)}
-            className="appearance-none pl-4 pr-10 py-2.5 text-sm bg-white border border-gray-200 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-300 cursor-pointer text-gray-700 font-medium">
-            {options.map((o) => <option key={o}>{o}</option>)}
-          </select>
-          <ChevronDown size={13} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-        </div>
-      ))}
-      <input type="date" value={dateFilter} onChange={(e) => setDateFilter(e.target.value)}
-        className="py-2.5 px-3 text-sm bg-white border border-gray-200 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-300 text-gray-700" />
-      <button className="flex items-center gap-2 px-4 py-2.5 bg-white border border-gray-200 rounded-xl shadow-sm text-sm font-medium text-gray-600 hover:bg-gray-50 transition cursor-pointer">
-        <SlidersHorizontal size={14} />
-      </button>
-      {hasFilters && (
-        <button onClick={onClear} className="flex items-center gap-1.5 px-3 py-2.5 text-xs font-semibold text-gray-500 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition cursor-pointer">
-          <X size={13} /> Clear
-        </button>
-      )}
-    </div>
-  );
-}
-
-function NotificationList({ grouped, onMarkRead }) {
-  if (Object.keys(grouped).length === 0) {
-    return (
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm py-20 text-center">
-        <Bell size={32} className="text-gray-200 mx-auto mb-3" />
-        <p className="text-sm text-gray-400 font-medium">No notifications found.</p>
-      </div>
-    );
-  }
-  return (
-    <div className="space-y-6">
-      {Object.entries(grouped).map(([label, items]) => (
-        <div key={label} className="space-y-2">
-          <p className="text-xs font-bold text-gray-400 tracking-widest px-1">{label}</p>
-          {items.map((n) => <NotificationCard key={n.id} n={n} onMarkRead={onMarkRead} />)}
-        </div>
-      ))}
-    </div>
-  );
-}
-
 export default function Notifications({ onUnreadChange }) {
-  const [notifications, setNotifications] = useState(MOCK_DATA);
-
-  const updateNotifications = (updated) => {
-    setNotifications(updated);
-    if (onUnreadChange) onUnreadChange(updated.filter(n => !n.is_read).length);
-  };
+  const [notifications, setNotifications] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState("All Types");
   const [statusFilter, setStatusFilter] = useState("All");
   const [dateFilter, setDateFilter] = useState("");
 
+  useEffect(() => {
+    getAdminNotifications()
+      .then((data) => {
+        const list = data.notifications || [];
+        setNotifications(list);
+        if (onUnreadChange) onUnreadChange(list.filter((n) => !n.is_read).length);
+      })
+      .catch(() => setNotifications([]))
+      .finally(() => setLoading(false));
+  }, []);
+
   const unreadCount = notifications.filter((n) => !n.is_read).length;
 
-  const handleMarkRead = (id) => updateNotifications(notifications.map((n) => n.id === id ? { ...n, is_read: true } : n));
-  const handleMarkAllRead = () => updateNotifications(notifications.map((n) => ({ ...n, is_read: true })));
-  const handleClearAll = () => updateNotifications([]);
+  const update = (updated) => {
+    setNotifications(updated);
+    if (onUnreadChange) onUnreadChange(updated.filter((n) => !n.is_read).length);
+  };
+
+  const handleMarkRead = (id) => update(notifications.map((n) => n.id === id ? { ...n, is_read: true } : n));
+  const handleMarkAllRead = () => update(notifications.map((n) => ({ ...n, is_read: true })));
+  const handleClearAll = () => update([]);
 
   const hasFilters = search || typeFilter !== "All Types" || statusFilter !== "All" || dateFilter;
 
@@ -187,7 +139,6 @@ export default function Notifications({ onUnreadChange }) {
 
   return (
     <div className="p-6 space-y-5 bg-gray-50 min-h-screen">
-      {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-orange-500 flex items-center justify-center">
@@ -212,20 +163,51 @@ export default function Notifications({ onUnreadChange }) {
         </div>
       </div>
 
-      {/* Stats removed */}
+      <div className="flex flex-wrap gap-3 items-center">
+        <div className="relative flex-1 min-w-[220px]">
+          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+          <input type="text" placeholder="Search by title, message or user ID..."
+            value={search} onChange={(e) => setSearch(e.target.value)}
+            className="w-full pl-9 pr-4 py-2.5 text-sm bg-white border border-gray-200 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-300 transition" />
+        </div>
+        {[
+          { value: typeFilter, set: setTypeFilter, options: ["All Types", "Registration", "Plan Purchase", "Assignment", "Expiry"] },
+          { value: statusFilter, set: setStatusFilter, options: ["All", "Unread", "Read"] },
+        ].map(({ value, set, options }, i) => (
+          <div key={i} className="relative">
+            <select value={value} onChange={(e) => set(e.target.value)}
+              className="appearance-none pl-4 pr-10 py-2.5 text-sm bg-white border border-gray-200 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-300 cursor-pointer text-gray-700 font-medium">
+              {options.map((o) => <option key={o}>{o}</option>)}
+            </select>
+            <ChevronDown size={13} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+          </div>
+        ))}
+        <input type="date" value={dateFilter} onChange={(e) => setDateFilter(e.target.value)}
+          className="py-2.5 px-3 text-sm bg-white border border-gray-200 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-300 text-gray-700" />
+        <button className="flex items-center gap-2 px-4 py-2.5 bg-white border border-gray-200 rounded-xl shadow-sm text-sm font-medium text-gray-600 hover:bg-gray-50 transition cursor-pointer">
+          <SlidersHorizontal size={14} />
+        </button>
+        {hasFilters && (
+          <button onClick={() => { setSearch(""); setTypeFilter("All Types"); setStatusFilter("All"); setDateFilter(""); }}
+            className="flex items-center gap-1.5 px-3 py-2.5 text-xs font-semibold text-gray-500 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition cursor-pointer">
+            <X size={13} /> Clear
+          </button>
+        )}
+      </div>
 
-      {/* Filters */}
-      <FilterBar
-        search={search} setSearch={setSearch}
-        typeFilter={typeFilter} setTypeFilter={setTypeFilter}
-        statusFilter={statusFilter} setStatusFilter={setStatusFilter}
-        dateFilter={dateFilter} setDateFilter={setDateFilter}
-        hasFilters={hasFilters}
-        onClear={() => { setSearch(""); setTypeFilter("All Types"); setStatusFilter("All"); setDateFilter(""); }}
-      />
-
-      {/* List */}
-      <NotificationList grouped={grouped} onMarkRead={handleMarkRead} />
+      {Object.keys(grouped).length === 0 ? (
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm py-20 text-center">
+          <Bell size={32} className="text-gray-200 mx-auto mb-3" />
+          <p className="text-sm text-gray-400 font-medium">No notifications found.</p>
+        </div>
+      ) : (
+        Object.entries(grouped).map(([label, items]) => (
+          <div key={label} className="space-y-2">
+            <p className="text-xs font-bold text-gray-400 tracking-widest px-1">{label}</p>
+            {items.map((n) => <NotificationCard key={n.id} n={n} onMarkRead={handleMarkRead} />)}
+          </div>
+        ))
+      )}
     </div>
   );
 }

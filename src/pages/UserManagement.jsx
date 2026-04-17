@@ -1,18 +1,13 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { Search, Eye, Pencil, ChevronDown, Loader2, X, MapPin, Calendar, CheckCircle, XCircle } from "lucide-react";
 import * as api from "../api/users";
-import { getPlans } from "../api/plans";
-import { TEST_USERS, TEST_PLANS } from "../testData";
-
-const USE_TEST_DATA = true;
 
 const STATUSES = ["All", "Active", "Inactive"];
 
 const planColors = {
-  Basic: "bg-blue-50 text-blue-600",
-  Hero: "bg-orange-50 text-orange-600",
-  Silver: "bg-purple-50 text-purple-600",
-  Free: "bg-green-50 text-green-600",
+  admin: "bg-red-50 text-red-600",
+  nutritionist: "bg-purple-50 text-purple-600",
+  user: "bg-blue-50 text-blue-600",
   None: "bg-gray-100 text-gray-500",
 };
 
@@ -21,14 +16,19 @@ export default function UserManagement({ pageState = {} }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [planOptions, setPlanOptions] = useState(["All"]);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
+  const PAGE_SIZE = 10;
   
   // Filters
   const [search, setSearch] = useState("");
   const [cityFilter, setCityFilter] = useState("");
+  const [countryFilter, setCountryFilter] = useState("");
   const [dateFilter, setDateFilter] = useState(pageState.dateFilter || "");
-  const [dateFilterMode, setDateFilterMode] = useState("date");
+  const [dateFilterMode, setDateFilterMode] = useState(pageState.dateFilterMode || "date");
   const [planFilter, setPlanFilter] = useState("All");
-  const [statusFilter, setStatusFilter] = useState("All");
+  const [statusFilter, setStatusFilter] = useState(pageState.statusFilter || "All");
   
   // Modals
   const [modal, setModal] = useState(null);
@@ -43,37 +43,30 @@ export default function UserManagement({ pageState = {} }) {
     setLoading(true);
     setError("");
     try {
-      if (USE_TEST_DATA) {
-        setUsers(TEST_USERS);
-        setLoading(false);
-        return;
-      }
-      const data = await api.getUsers();
-      const userList = Array.isArray(data) ? data : (data.results || []);
-      setUsers(userList);
+      const filters = { search, role: planFilter, status: statusFilter };
+      if (cityFilter) filters.city = cityFilter;
+      if (countryFilter) filters.country = countryFilter;
+      if (dateFilterMode === "date" && dateFilter) filters.date = dateFilter;
+      else if (dateFilterMode === "month" && dateFilter) { const [y, m] = dateFilter.split("-"); filters.month = m; filters.year = y; }
+      else if (dateFilterMode === "year" && dateFilter) filters.year = dateFilter;
+      const data = await api.getUsers(filters, page, PAGE_SIZE);
+      setUsers(data.results || []);
+      setTotalPages(data.total_pages || 1);
+      setTotalCount(data.total || 0);
     } catch (err) {
       setError(err.message);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [search, page, planFilter, statusFilter, dateFilter, dateFilterMode, cityFilter, countryFilter]);
 
   useEffect(() => {
     fetchUsers();
   }, [fetchUsers]);
 
   useEffect(() => {
-    if (USE_TEST_DATA) {
-      const active = TEST_PLANS.filter((p) => p.is_active).map((p) => p.name);
-      setPlanOptions(["All", ...active]);
-      return;
-    }
-    getPlans().then((data) => {
-      const active = (Array.isArray(data) ? data : data.results || [])
-        .filter((p) => p.is_active)
-        .map((p) => p.name);
-      setPlanOptions(["All", ...active]);
-    }).catch(() => {});
+    // Use roles from actual user data instead of subscription plans
+    setPlanOptions(["All", "user", "nutritionist", "admin"]);
   }, []);
 
   const handleToggleActive = async (user) => {
@@ -103,28 +96,7 @@ export default function UserManagement({ pageState = {} }) {
     }
   };
 
-  const filtered = useMemo(() => {
-    return users.filter((u) => {
-      // 1. Search Query (Name & Email)
-      const lowerSearch = search.toLowerCase();
-      const matchSearch = !search || 
-        (u.full_name || "").toLowerCase().includes(lowerSearch) || 
-        (u.email || "").toLowerCase().includes(lowerSearch);
-        
-      // 2. City Filter 
-      const matchCity = !cityFilter || (u.city || "").toLowerCase().includes(cityFilter.toLowerCase());
-
-      // 3. Date Filter 
-      const matchDate = !dateFilter || (u.date_joined && u.date_joined.startsWith(dateFilter));
-
-      // 4. Plan & Status
-      const matchPlan = planFilter === "All" || (u.plan || "Free") === planFilter;
-      const matchStatus = statusFilter === "All" ||
-        (statusFilter === "Active" ? u.is_active : !u.is_active);
-        
-      return matchSearch && matchCity && matchDate && matchPlan && matchStatus;
-    });
-  }, [users, search, cityFilter, dateFilter, planFilter, statusFilter]);
+  const filtered = users; // filtering done server-side
 
   return (
     <div className="p-6 space-y-5 bg-gray-50 min-h-screen">
@@ -152,7 +124,7 @@ export default function UserManagement({ pageState = {} }) {
       {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {[
-          { label: "Total Registered", value: users.length, color: "text-gray-900" },
+          { label: "Total Registered", value: totalCount, color: "text-gray-900" },
           { label: "Active Access", value: users.filter((u) => u.is_active).length, color: "text-green-600" },
           { label: "Revoked Access", value: users.filter((u) => !u.is_active).length, color: "text-red-500" },
         ].map(({ label, value, color }) => (
@@ -174,7 +146,7 @@ export default function UserManagement({ pageState = {} }) {
               type="text"
               placeholder="Search by name or email..."
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(e) => { setSearch(e.target.value); setPage(1); }}
               className="w-full pl-9 pr-4 py-2 text-sm bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-300 focus:border-orange-400 transition"
             />
           </div>
@@ -185,7 +157,18 @@ export default function UserManagement({ pageState = {} }) {
               type="text"
               placeholder="City..."
               value={cityFilter}
-              onChange={(e) => setCityFilter(e.target.value)}
+              onChange={(e) => { setCityFilter(e.target.value); setPage(1); }}
+              className="w-full pl-9 pr-4 py-2 text-sm bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-300 focus:border-orange-400 transition"
+            />
+          </div>
+
+          <div className="relative flex-1 min-w-[150px]">
+            <MapPin size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Country..."
+              value={countryFilter}
+              onChange={(e) => { setCountryFilter(e.target.value); setPage(1); }}
               className="w-full pl-9 pr-4 py-2 text-sm bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-300 focus:border-orange-400 transition"
             />
           </div>
@@ -215,8 +198,8 @@ export default function UserManagement({ pageState = {} }) {
           </div>
 
           {[
-            { label: "Plan", options: planOptions, value: planFilter, set: setPlanFilter },
-            { label: "Status", options: STATUSES, value: statusFilter, set: setStatusFilter },
+            { label: "Role", options: planOptions, value: planFilter, set: (v) => { setPlanFilter(v); setPage(1); } },
+            { label: "Status", options: STATUSES, value: statusFilter, set: (v) => { setStatusFilter(v); setPage(1); } },
           ].map(({ label, options, value, set }) => (
             <div key={label} className="relative min-w-[120px]">
               <select value={value} onChange={(e) => set(e.target.value)}
@@ -235,7 +218,7 @@ export default function UserManagement({ pageState = {} }) {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-gray-100 bg-gray-50/80">
-                {["Name", "Email", "City", "Plan", "Status", "Registered", "Actions"].map((h) => (
+                {["Name", "Email", "City", "Role", "Status", "Registered", "Actions"].map((h) => (
                   <th key={h} className="text-left px-5 py-3.5 text-xs font-semibold text-gray-500 uppercase tracking-wider">{h}</th>
                 ))}
               </tr>
@@ -261,8 +244,8 @@ export default function UserManagement({ pageState = {} }) {
                     <td className="px-5 py-4 text-gray-500 font-medium">{user.email || "—"}</td>
                     <td className="px-5 py-4 text-gray-600">{user.city || "—"}</td>
                     <td className="px-5 py-4">
-                      <span className={`px-2.5 py-1 rounded-md text-xs font-bold ${planColors[user.plan] || planColors.None}`}>
-                        {user.plan || "Free"}
+                      <span className={`px-2.5 py-1 rounded-md text-xs font-bold ${planColors[user.role] || planColors.None}`}>
+                        {user.role || "user"}
                       </span>
                     </td>
                     <td className="px-5 py-4">
@@ -305,9 +288,82 @@ export default function UserManagement({ pageState = {} }) {
         </div>
 
         <div className="px-5 py-3.5 border-t border-gray-100 flex items-center justify-between text-xs text-gray-500 font-medium">
-          <span>Showing {filtered.length} of {users.length} users</span>
+          <span>Showing {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, totalCount)} of {totalCount} users</span>
+          <div className="flex items-center gap-2">
+            <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
+              className="px-3 py-1.5 border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition cursor-pointer">
+              Prev
+            </button>
+            <span className="px-2">Page {page} of {totalPages}</span>
+            <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}
+              className="px-3 py-1.5 border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition cursor-pointer">
+              Next
+            </button>
+          </div>
         </div>
       </div>
+
+      <NoProfileUsersSection />
+    </div>
+  );
+}
+
+function NoProfileUsersSection() {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [expanded, setExpanded] = useState(false);
+
+  useEffect(() => {
+    api.getUsersWithPaymentNoProfile()
+      .then(setData)
+      .catch(() => setData(null))
+      .finally(() => setLoading(false));
+  }, []);
+
+  if (loading || !data || data.total_missing_users === 0) return null;
+
+  return (
+    <div className="bg-white rounded-xl border border-red-100 shadow-sm overflow-hidden">
+      <div onClick={() => setExpanded(!expanded)}
+        className="flex items-center justify-between px-5 py-4 cursor-pointer hover:bg-red-50/30 transition">
+        <div>
+          <p className="text-sm font-bold text-red-600">Users with Payment but No Health Profile</p>
+          <p className="text-xs text-gray-400 mt-0.5">{data.total_missing_users} user(s) made payments but haven't completed their profile</p>
+        </div>
+        <span className="px-3 py-1 bg-red-50 text-red-600 text-xs font-bold rounded-full border border-red-100">
+          {data.total_missing_users} missing
+        </span>
+      </div>
+      {expanded && (
+        <div className="border-t border-red-100 overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="bg-red-50/50 border-b border-red-100">
+                {["User", "Plan ID", "Amount", "Status", "Date"].map((h) => (
+                  <th key={h} className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {data.users_data.map((u, i) => (
+                <tr key={i} className="border-b border-gray-50 hover:bg-red-50/20 transition">
+                  <td className="px-5 py-3 font-semibold text-gray-800">{u.user_name || `#${u.user_id}`}</td>
+                  <td className="px-5 py-3 text-gray-500">#{u.plan_id}</td>
+                  <td className="px-5 py-3 text-orange-600 font-semibold">Rs {u.amount}</td>
+                  <td className="px-5 py-3">
+                    <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${u.status === "success" ? "bg-green-50 text-green-600" : "bg-red-50 text-red-500"}`}>
+                      {u.status}
+                    </span>
+                  </td>
+                  <td className="px-5 py-3 text-gray-400 text-xs">
+                    {new Date(u.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }
@@ -414,10 +470,11 @@ function ViewModal({ user, profile, loading, onClose }) {
           {/* User info */}
           <div className="grid grid-cols-2 gap-3">
             {[
-              ["Plan", user.plan],
+              ["Role", user.role],
               ["Status", user.is_active ? "Active" : "Inactive"],
               ["Joined", user.date_joined ? new Date(user.date_joined).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" }) : "—"],
               ["City", user.city || profile?.city || "—"],
+              ["Plan", user.plan || "—"],
             ].map(([label, value]) => (
               <div key={label} className="bg-gray-50 rounded-xl px-4 py-3 border border-gray-100">
                 <p className="text-xs font-bold text-gray-400 uppercase tracking-wide">{label}</p>
