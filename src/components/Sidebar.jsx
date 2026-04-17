@@ -1,20 +1,12 @@
 import {
-  LayoutDashboard,
-  Users,
-  UtensilsCrossed,
-  ClipboardList,
-  TrendingUp,
-  CalendarCheck,
-  BookOpen,
-  Bell,
-  Settings,
-  LogOut,
-  CreditCard,
+  LayoutDashboard, Users, UtensilsCrossed, ClipboardList,
+  TrendingUp, CalendarCheck, BookOpen, Bell, Settings, CreditCard, Stethoscope,
 } from "lucide-react";
 
 const navItems = [
   { icon: LayoutDashboard, label: "Dashboard", id: "dashboard" },
   { icon: Users, label: "User Management", id: "users" },
+  { icon: Stethoscope, label: "Nutritionists", id: "nutritionists" },
   { icon: CreditCard, label: "Subscription Plans", id: "plans" },
   { icon: CreditCard, label: "Subscription Payments", id: "payments" },
   { icon: UtensilsCrossed, label: "Meals", id: "meals" },
