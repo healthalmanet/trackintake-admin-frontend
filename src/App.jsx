@@ -20,7 +20,18 @@ function PlaceholderPage({ title }) {
 export default function App() {
   const [activePage, setActivePage] = useState(() => sessionStorage.getItem("activePage") || "dashboard");
   const [pageState, setPageState] = useState({});
-  const [unreadCount, setUnreadCount] = useState(4);
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  // Fetch unread notification count on load
+  useEffect(() => {
+    fetch("/api/notifications/")
+      .then(r => r.ok ? r.json() : { notifications: [] })
+      .then(data => {
+        const list = data.notifications || [];
+        setUnreadCount(list.filter(n => !n.is_read).length);
+      })
+      .catch(() => {});
+  }, []);
 
   const handleNavigate = (page) => {
     sessionStorage.setItem("activePage", page);

@@ -9,7 +9,9 @@ import {
 } from "recharts";
 import { getDashboardStats } from "../api/dashboard";
 
-const PLAN_COLORS = { Free: "#9ca3af", Basic: "#3b82f6", Hero: "#f97316", Silver: "#a855f7" };
+const PLAN_COLORS = { free: "#9ca3af", basic: "#3b82f6", hero: "#f97316", silver: "#a855f7" };
+const PLAN_COLOR_LIST = ["#f97316", "#3b82f6", "#a855f7", "#22c55e", "#eab308"];
+
 const MEAL_COLORS = ["#f97316", "#3b82f6", "#22c55e", "#eab308", "#a855f7"];
 
 function formatActivity(activities) {
@@ -69,6 +71,18 @@ export default function Dashboard({ pageState }) {
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split("T")[0]);
   const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7));
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear().toString());
+  const [plansMap, setPlansMap] = useState({});
+
+  // Fetch plans map once
+  useEffect(() => {
+    fetch("/api/subscription/plans/")
+      .then(r => r.ok ? r.json() : [])
+      .then(list => {
+        const m = {};
+        (Array.isArray(list) ? list : []).forEach(p => { m[p.id] = p.name; });
+        setPlansMap(m);
+      }).catch(() => {});
+  }, []);
 
   useEffect(() => {
     setLoading(true);
@@ -88,12 +102,18 @@ export default function Dashboard({ pageState }) {
           revenueByPlan: res.revenueByPlan ?? [],
           pendingAppts: res.pendingAppts ?? 0,
           growthData: res.userGrowth?.length ? res.userGrowth : [],
-          revenueTrend: res.revenueTrend?.length ? res.revenueTrend : [],
-          planDist: (res.planDistribution ?? []).map((p) => ({
-            name: p.plan || p.plan_id || "Unknown",
-            value: p.users ?? p.count ?? 0,
-            pct: res.totalUsers ? Math.round(((p.users ?? p.count ?? 0) / (res.totalUsers)) * 100) : 0,
-            color: PLAN_COLORS[p.plan] ?? PLAN_COLORS[p.plan_id] ?? "#9ca3af",
+          planDist: (res.planDistribution ?? []).map((p, i) => {
+            const planName = plansMap[p.plan_id] || plansMap[p.plan] || p.plan || `Plan ${p.plan_id}`;
+            return {
+              name: planName,
+              value: p.users ?? p.count ?? 0,
+              pct: res.totalUsers ? Math.round(((p.users ?? p.count ?? 0) / res.totalUsers) * 100) : 0,
+              color: PLAN_COLORS[planName.toLowerCase()] ?? PLAN_COLOR_LIST[i % PLAN_COLOR_LIST.length],
+            };
+          }),
+          revenueTrend: (res.revenueByPlan ?? []).map((p, i) => ({
+            month: plansMap[p.plan_id] || `Plan ${p.plan_id}`,
+            revenue: p.total_revenue ?? 0,
           })),
           mealCats: res.mealCats?.length ? res.mealCats : [],
           activity: formatActivity(res.recentActivity || []),
@@ -104,7 +124,7 @@ export default function Dashboard({ pageState }) {
         setData(null);
       })
       .finally(() => setLoading(false));
-  }, [timeRange, selectedDate, selectedMonth, selectedYear]);
+  }, [timeRange, selectedDate, selectedMonth, selectedYear, plansMap]);
 
   const handleRevenueClick = () => {
     const targetRange = timeRange === "day" ? "date" : timeRange;
