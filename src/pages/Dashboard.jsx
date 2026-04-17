@@ -8,11 +8,10 @@ import {
   BarChart, Bar, Cell, PieChart, Pie, AreaChart, Area, CartesianGrid
 } from "recharts";
 import { getDashboardStats } from "../api/dashboard";
-import { getDashboardTestData } from "../testData";
 
-const USE_TEST_DATA = true;
+const PLAN_COLORS = { free: "#9ca3af", basic: "#3b82f6", hero: "#f97316", silver: "#a855f7" };
+const PLAN_COLOR_LIST = ["#f97316", "#3b82f6", "#a855f7", "#22c55e", "#eab308"];
 
-const PLAN_COLORS = { Free: "#9ca3af", Basic: "#3b82f6", Hero: "#f97316", Silver: "#a855f7" };
 const MEAL_COLORS = ["#f97316", "#3b82f6", "#22c55e", "#eab308", "#a855f7"];
 
 function formatActivity(activities) {
@@ -68,48 +67,32 @@ const CustomDot = ({ cx, cy, fill }) => <circle cx={cx} cy={cy} r={4.5} fill={fi
 export default function Dashboard({ pageState }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [timeRange, setTimeRange] = useState(() => sessionStorage.getItem("dash_range") || "month");
-  const [selectedDate, setSelectedDate] = useState(() => sessionStorage.getItem("dash_date") || new Date().toISOString().split("T")[0]);
-  const [selectedMonth, setSelectedMonth] = useState(() => sessionStorage.getItem("dash_month") || new Date().toISOString().slice(0, 7));
-  const [selectedYear, setSelectedYear] = useState(() => sessionStorage.getItem("dash_year") || new Date().getFullYear().toString());
+  const [timeRange, setTimeRange] = useState("month");
+  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split("T")[0]);
+  const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7));
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear().toString());
+  const [plansMap, setPlansMap] = useState({});
+
+  // Fetch plans map once
+  useEffect(() => {
+    fetch("/api/subscription/plans/")
+      .then(r => r.ok ? r.json() : [])
+      .then(list => {
+        const m = {};
+        (Array.isArray(list) ? list : []).forEach(p => { m[p.id] = p.name; });
+        setPlansMap(m);
+      }).catch(() => {});
+  }, []);
 
   useEffect(() => {
     setLoading(true);
-
-    if (USE_TEST_DATA) {
-      let apiDate = undefined;
-      if (timeRange === "day") apiDate = selectedDate;
-      if (timeRange === "month") apiDate = selectedMonth;
-      if (timeRange === "year") apiDate = selectedYear;
-      const res = getDashboardTestData(timeRange, apiDate);
-      setData({
-        totalUsers: res.totalUsers,
-        activeUsers: res.activeUsers,
-        totalRevenue: res.totalRevenue ?? 0,
-        revenueByPlan: res.revenueByPlan ?? [],
-        pendingAppts: res.pendingAppts ?? 0,
-        growthData: res.userGrowth?.length ? res.userGrowth : [],
-        revenueTrend: res.revenueTrend?.length ? res.revenueTrend : [],
-        planDist: (res.planDistribution ?? []).map((p) => ({
-          name: p.plan || p.plan_id || "Unknown",
-          value: p.users ?? p.count ?? 0,
-          pct: res.totalUsers ? Math.round(((p.users ?? p.count ?? 0) / res.totalUsers) * 100) : 0,
-          color: PLAN_COLORS[p.plan] ?? PLAN_COLORS[p.plan_id] ?? "#9ca3af",
-        })),
-        mealCats: res.mealCats?.length ? res.mealCats : [],
-        activity: formatActivity(res.recentActivity || []),
-      });
-      setLoading(false);
-      return;
-    }
-
     let apiDate = undefined;
     if (timeRange === "day") apiDate = selectedDate;
     if (timeRange === "month") apiDate = selectedMonth;
     if (timeRange === "year") apiDate = selectedYear;
     // timeRange === "all" → apiDate stays undefined → backend returns all-time data
 
-    // # Assuming backend takes ?timeRange and optional ?date
+    // Assuming backend takes ?timeRange=... and optional ?date=...
     getDashboardStats({ range: timeRange, date: apiDate })
       .then((res) => {
         setData({
@@ -119,12 +102,18 @@ export default function Dashboard({ pageState }) {
           revenueByPlan: res.revenueByPlan ?? [],
           pendingAppts: res.pendingAppts ?? 0,
           growthData: res.userGrowth?.length ? res.userGrowth : [],
-          revenueTrend: res.revenueTrend?.length ? res.revenueTrend : [],
-          planDist: (res.planDistribution ?? []).map((p) => ({
-            name: p.plan || p.plan_id || "Unknown",
-            value: p.users ?? p.count ?? 0,
-            pct: res.totalUsers ? Math.round(((p.users ?? p.count ?? 0) / (res.totalUsers)) * 100) : 0,
-            color: PLAN_COLORS[p.plan] ?? PLAN_COLORS[p.plan_id] ?? "#9ca3af",
+          planDist: (res.planDistribution ?? []).map((p, i) => {
+            const planName = plansMap[p.plan_id] || plansMap[p.plan] || p.plan || `Plan ${p.plan_id}`;
+            return {
+              name: planName,
+              value: p.users ?? p.count ?? 0,
+              pct: res.totalUsers ? Math.round(((p.users ?? p.count ?? 0) / res.totalUsers) * 100) : 0,
+              color: PLAN_COLORS[planName.toLowerCase()] ?? PLAN_COLOR_LIST[i % PLAN_COLOR_LIST.length],
+            };
+          }),
+          revenueTrend: (res.revenueByPlan ?? []).map((p, i) => ({
+            month: plansMap[p.plan_id] || `Plan ${p.plan_id}`,
+            revenue: p.total_revenue ?? 0,
           })),
           mealCats: res.mealCats?.length ? res.mealCats : [],
           activity: formatActivity(res.recentActivity || []),
@@ -135,7 +124,7 @@ export default function Dashboard({ pageState }) {
         setData(null);
       })
       .finally(() => setLoading(false));
-  }, [timeRange, selectedDate, selectedMonth, selectedYear]);
+  }, [timeRange, selectedDate, selectedMonth, selectedYear, plansMap]);
 
   const handleRevenueClick = () => {
     const targetRange = timeRange === "day" ? "date" : timeRange;
@@ -170,7 +159,7 @@ export default function Dashboard({ pageState }) {
 
   return (
     <div className="p-6 space-y-6 bg-[#fafafa] min-h-full">
-      {/* Header & Filters */}
+      {/* Header & Global Filters */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold text-gray-900 tracking-tight">Dashboard Overview</h1>
@@ -191,7 +180,7 @@ export default function Dashboard({ pageState }) {
             <input 
               type="date" 
               value={selectedDate}
-              onChange={(e) => { setSelectedDate(e.target.value); sessionStorage.setItem("dash_date", e.target.value); }}
+              onChange={(e) => setSelectedDate(e.target.value)}
               className="px-3 py-2 text-sm bg-white border border-gray-200 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-300 transition-all font-medium text-gray-700"
             />
           )}
@@ -199,7 +188,7 @@ export default function Dashboard({ pageState }) {
             <input 
               type="month" 
               value={selectedMonth}
-              onChange={(e) => { setSelectedMonth(e.target.value); sessionStorage.setItem("dash_month", e.target.value); }}
+              onChange={(e) => setSelectedMonth(e.target.value)}
               className="px-3 py-2 text-sm bg-white border border-gray-200 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-300 transition-all font-medium text-gray-700"
             />
           )}
@@ -208,14 +197,14 @@ export default function Dashboard({ pageState }) {
               type="number" 
               min="2020" max="2100"
               value={selectedYear}
-              onChange={(e) => { setSelectedYear(e.target.value); sessionStorage.setItem("dash_year", e.target.value); }}
+              onChange={(e) => setSelectedYear(e.target.value)}
               className="px-3 py-2 text-sm bg-white border border-gray-200 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-300 transition-all font-medium text-gray-700 w-24"
             />
           )}
           <div className="relative">
             <select 
               value={timeRange}
-              onChange={(e) => { setTimeRange(e.target.value); sessionStorage.setItem("dash_range", e.target.value); }}
+              onChange={(e) => setTimeRange(e.target.value)}
               className="appearance-none px-4 py-2 text-sm font-semibold text-gray-700 bg-white border border-gray-200 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-300 transition-all cursor-pointer pr-10"
             >
               <option value="day">Date</option>
