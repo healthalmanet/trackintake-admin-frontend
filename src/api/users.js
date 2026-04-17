@@ -54,8 +54,9 @@ export const assignNutritionist = async (userId, nutritionistId) => {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ user_id: userId, nutritionist_id: nutritionistId }),
   });
-  if (!res.ok) throw new Error("Failed to assign nutritionist");
-  return res.json();
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.error || json.message || "Failed to assign nutritionist");
+  return json;
 };
 
 export const getNutritionists = async () => {
