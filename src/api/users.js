@@ -10,7 +10,7 @@ export const getUsers = async (filters = {}, page = 1, pageSize = 10) => {
   if (filters.date) params.append("date", filters.date);
   if (filters.month) params.append("month", filters.month);
   if (filters.year) params.append("year", filters.year);
-  const res = await fetch(`${BASE}/?${params}`);
+  const res = await fetch(`${BASE}/user-list-create/?${params}`);
   if (!res.ok) throw new Error("Failed to fetch users");
   return res.json();
 };

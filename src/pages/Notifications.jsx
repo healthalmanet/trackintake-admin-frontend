@@ -3,7 +3,7 @@ import {
   UserPlus, CreditCard, UserCheck, Clock3, Bell,
   CheckCheck, Search, ChevronDown, X, Trash2, SlidersHorizontal, Loader2
 } from "lucide-react";
-import { getAdminNotifications } from "../api/notifications";
+import { getAdminNotifications, markNotificationRead, markAllNotificationsRead } from "../api/notifications";
 
 const MOCK_DATA = [
   { id: 1, title: "New User Registration", message: "Aarav Sharma registered a new account.", type: "Registration", notif_type: "USER", user_id: 101, is_read: false, created_at: "2026-04-07T09:30:00Z" },
@@ -116,8 +116,15 @@ export default function Notifications({ onUnreadChange }) {
     if (onUnreadChange) onUnreadChange(updated.filter((n) => !n.is_read).length);
   };
 
-  const handleMarkRead = (id) => update(notifications.map((n) => n.id === id ? { ...n, is_read: true } : n));
-  const handleMarkAllRead = () => update(notifications.map((n) => ({ ...n, is_read: true })));
+  const handleMarkRead = async (id) => {
+    try { await markNotificationRead(id); } catch (e) { console.error(e); }
+    update(notifications.map((n) => n.id === id ? { ...n, is_read: true } : n));
+  };
+
+  const handleMarkAllRead = async () => {
+    try { await markAllNotificationsRead("admin"); } catch (e) { console.error(e); }
+    update(notifications.map((n) => ({ ...n, is_read: true })));
+  };
   const handleClearAll = () => update([]);
 
   const hasFilters = search || typeFilter !== "All Types" || statusFilter !== "All" || dateFilter;
