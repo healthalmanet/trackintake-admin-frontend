@@ -227,7 +227,7 @@ export default function Nutritionists() {
       await assignNutritionist(patientId, profile.user_id);
       const patient = patients.find((p) => p.id === parseInt(patientId));
       setAssignModal(null);
-      showToast(`${patient?.full_name || "Patient"} assigned to ${profile.user_name || "nutritionist"}${notify ? " · Notification sent" : ""}`);
+      showToast(`${profile.user_name || "Nutritionist"} assigned to ${patient?.full_name || "Patient"}${notify ? " · Notification sent" : ""}`);
     } catch (err) {
       showToast("Assignment failed: " + err.message);
     }
