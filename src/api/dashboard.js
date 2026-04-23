@@ -51,7 +51,6 @@ export const getDashboardStats = async ({ range, date } = {}) => {
     planDistribution: planDistRes.planDistribution ?? [],
     revenueByPlan: revenueByPlanRes.revenueByPlan ?? [],
     recentActivity: recentRes.recentSignups ?? [],
-    revenueTrend: [],
     mealCats: [],
   };
 };

@@ -64,8 +64,7 @@ export default function SubscriptionPayments() {
       if (debouncedSearch) params.search = debouncedSearch;
       if (statusFilter !== "all") params.status = statusFilter;
 
-      const res = await fetch(`/api/subscription/usage/?${new URLSearchParams(params)}`);
-      const data = await res.json();
+      const data = await getPayments(params);
       setPayments(Array.isArray(data.results) ? data.results : []);
       setTotalPages(data.total_pages || 1);
       setTotalCount(data.total || 0);

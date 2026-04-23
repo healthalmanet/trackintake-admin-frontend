@@ -112,7 +112,7 @@ export default function Dashboard({ pageState }) {
             };
           }),
           revenueTrend: (res.revenueByPlan ?? []).map((p, i) => ({
-            month: plansMap[p.plan_id] || `Plan ${p.plan_id}`,
+            month: p.plan_name || plansMap[p.plan_id] || `Plan ${p.plan_id}`,
             revenue: p.total_revenue ?? 0,
           })),
           mealCats: res.mealCats?.length ? res.mealCats : [],
