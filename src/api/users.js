@@ -1,4 +1,6 @@
-const BASE = `${import.meta.env.VITE_API_BASE_URL || ""}/api/users`;
+import { API_BASE_URL } from '../config';
+
+const BASE = `${API_BASE_URL}/api/users`;
 
 export const getUsers = async (filters = {}, page = 1, pageSize = 10) => {
   const params = new URLSearchParams({ page, page_size: pageSize });
