@@ -1,4 +1,6 @@
-const BASE = `${import.meta.env.VITE_API_BASE_URL || ""}/api/dashboard`;
+import { API_BASE_URL } from '../config';
+
+const BASE = `${API_BASE_URL}/api/dashboard`;
 
 const fetchJSON = async (url) => {
   const res = await fetch(url);

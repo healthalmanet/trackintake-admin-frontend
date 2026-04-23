@@ -1,4 +1,6 @@
-const BASE = `${import.meta.env.VITE_API_BASE_URL || ""}/api/notifications`;
+import { API_BASE_URL } from '../config';
+
+const BASE = `${API_BASE_URL}/api/notifications`;
 
 export const getAdminNotifications = async (type = "admin") => {
   const res = await fetch(`${BASE}/admin-notifications/?type=${type}`);
