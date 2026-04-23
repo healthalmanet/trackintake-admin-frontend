@@ -32,14 +32,14 @@ export const getDashboardStats = async ({ range, date } = {}) => {
     revenueByPlanRes,
     recentRes,
   ] = await Promise.all([
-    fetchJSON(`${BASE}/total-users/${params}`),
-    fetchJSON(`${BASE}/active-users/${params}`),
-    fetchJSON(`${BASE}/total-revenue/${params}`),
-    fetchJSON(`${BASE}/pending-appointments/${params}`),
-    fetchJSON(`${BASE}/user-growth/${params}`),
-    fetchJSON(`${BASE}/plan-distribution/${params}`),
-    fetchJSON(`${BASE}/revenue-by-plan/${params}`),
-    fetchJSON(`${BASE}/recent-activity/${params}`),
+    fetchJSON(`${BASE}/total-users${params}`),
+    fetchJSON(`${BASE}/active-users${params}`),
+    fetchJSON(`${BASE}/total-revenue${params}`),
+    fetchJSON(`${BASE}/pending-appointments${params}`),
+    fetchJSON(`${BASE}/user-growth${params}`),
+    fetchJSON(`${BASE}/plan-distribution${params}`),
+    fetchJSON(`${BASE}/revenue-by-plan${params}`),
+    fetchJSON(`${BASE}/recent-activity${params}`),
   ]);
 
   return {
