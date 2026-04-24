@@ -24,10 +24,10 @@ export default function App() {
 
   // Fetch unread notification count on load
   useEffect(() => {
-    fetch("/api/notifications/")
-      .then(r => r.ok ? r.json() : { notifications: [] })
+    fetch(`${import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000'}/api/notifications/admin-notifications/`)
+      .then(r => r.ok ? r.json() : { results: [] })
       .then(data => {
-        const list = data.notifications || [];
+        const list = data.results || [];
         setUnreadCount(list.filter(n => !n.is_read).length);
       })
       .catch(() => {});
