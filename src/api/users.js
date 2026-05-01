@@ -85,3 +85,13 @@ export const getSubscribedUsers = async () => {
   const data = await res.json();
   return data.results || [];
 };
+
+export const getEligibleUsersForNutritionist = async (nutritionistType = '') => {
+  let url = `${BASE}/eligible-users-for-nutritionist/`;
+  if (nutritionistType) {
+    url += `?nutritionist_type=${nutritionistType}`;
+  }
+  const res = await fetch(url);
+  if (!res.ok) throw new Error("Failed to fetch eligible users");
+  return res.json();
+};

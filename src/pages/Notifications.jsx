@@ -80,6 +80,21 @@ function NotificationCard({ n, onMarkRead }) {
         </div>
       </div>
       <div className="flex items-center gap-3 shrink-0">
+        {n.message?.toLowerCase().includes("please assign a nutritionist") && (
+          <button
+            onClick={() => {
+              window.dispatchEvent(new CustomEvent("app-nav", {
+                detail: {
+                  page: "nutritionists",
+                  state: { user_id: n.user_id }
+                }
+              }));
+            }}
+            className="px-2.5 py-1 rounded-full text-[10px] font-bold border bg-orange-500 text-white border-orange-500 hover:bg-orange-600 cursor-pointer transition"
+          >
+            Assign Nutritionist
+          </button>
+        )}
         <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase border tracking-wide ${cfg.badge}`}>{n.type}</span>
         <button onClick={() => !n.is_read && onMarkRead(n.id)} title={n.is_read ? "Read" : "Mark as read"}
           className={`transition cursor-pointer ${n.is_read ? "text-orange-400" : "text-gray-300 hover:text-orange-400"}`}>
@@ -105,7 +120,11 @@ export default function Notifications({ onUnreadChange }) {
         setNotifications(list);
         if (onUnreadChange) onUnreadChange(list.filter((n) => !n.is_read).length);
       })
-      .catch(() => setNotifications([]))
+      .catch((error) => {
+        console.error('Error fetching notifications:', error);
+        setNotifications([]);
+        if (onUnreadChange) onUnreadChange(0);
+      })
       .finally(() => setLoading(false));
   }, []);
 
@@ -146,74 +165,85 @@ export default function Notifications({ onUnreadChange }) {
 
   return (
     <div className="p-6 space-y-5 bg-gray-50 min-h-screen">
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-orange-500 flex items-center justify-center">
-            <Bell size={18} className="text-white" />
+      {loading ? (
+        <div className="flex items-center justify-center min-h-screen">
+          <div className="text-center">
+            <Loader2 size={32} className="text-orange-500 animate-spin mx-auto mb-4" />
+            <p className="text-gray-600">Loading notifications...</p>
           </div>
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">Notifications</h1>
-            <p className="text-sm text-gray-500">{unreadCount} unread</p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          {unreadCount > 0 && (
-            <button onClick={handleMarkAllRead}
-              className="flex items-center gap-2 px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white text-sm font-semibold rounded-xl transition cursor-pointer shadow-sm">
-              <CheckCheck size={15} /> Mark All Read
-            </button>
-          )}
-          <button onClick={handleClearAll}
-            className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 hover:bg-red-50 hover:text-red-500 hover:border-red-200 text-gray-600 text-sm font-semibold rounded-xl transition cursor-pointer shadow-sm">
-            <Trash2 size={15} /> Clear All
-          </button>
-        </div>
-      </div>
-
-      <div className="flex flex-wrap gap-3 items-center">
-        <div className="relative flex-1 min-w-[220px]">
-          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-          <input type="text" placeholder="Search by title, message or user ID..."
-            value={search} onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-9 pr-4 py-2.5 text-sm bg-white border border-gray-200 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-300 transition" />
-        </div>
-        {[
-          { value: typeFilter, set: setTypeFilter, options: ["All Types", "Registration", "Plan Purchase", "Assignment", "Expiry"] },
-          { value: statusFilter, set: setStatusFilter, options: ["All", "Unread", "Read"] },
-        ].map(({ value, set, options }, i) => (
-          <div key={i} className="relative">
-            <select value={value} onChange={(e) => set(e.target.value)}
-              className="appearance-none pl-4 pr-10 py-2.5 text-sm bg-white border border-gray-200 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-300 cursor-pointer text-gray-700 font-medium">
-              {options.map((o) => <option key={o}>{o}</option>)}
-            </select>
-            <ChevronDown size={13} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-          </div>
-        ))}
-        <input type="date" value={dateFilter} onChange={(e) => setDateFilter(e.target.value)}
-          className="py-2.5 px-3 text-sm bg-white border border-gray-200 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-300 text-gray-700" />
-        <button className="flex items-center gap-2 px-4 py-2.5 bg-white border border-gray-200 rounded-xl shadow-sm text-sm font-medium text-gray-600 hover:bg-gray-50 transition cursor-pointer">
-          <SlidersHorizontal size={14} />
-        </button>
-        {hasFilters && (
-          <button onClick={() => { setSearch(""); setTypeFilter("All Types"); setStatusFilter("All"); setDateFilter(""); }}
-            className="flex items-center gap-1.5 px-3 py-2.5 text-xs font-semibold text-gray-500 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition cursor-pointer">
-            <X size={13} /> Clear
-          </button>
-        )}
-      </div>
-
-      {Object.keys(grouped).length === 0 ? (
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm py-20 text-center">
-          <Bell size={32} className="text-gray-200 mx-auto mb-3" />
-          <p className="text-sm text-gray-400 font-medium">No notifications found.</p>
         </div>
       ) : (
-        Object.entries(grouped).map(([label, items]) => (
-          <div key={label} className="space-y-2">
-            <p className="text-xs font-bold text-gray-400 tracking-widest px-1">{label}</p>
-            {items.map((n) => <NotificationCard key={n.id} n={n} onMarkRead={handleMarkRead} />)}
+        <>
+          <div className="flex items-center justify-between flex-wrap gap-3">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-orange-500 flex items-center justify-center">
+                <Bell size={18} className="text-white" />
+              </div>
+              <div>
+                <h1 className="text-2xl font-bold text-gray-900">Notifications</h1>
+                <p className="text-sm text-gray-500">{unreadCount} unread</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              {unreadCount > 0 && (
+                <button onClick={handleMarkAllRead}
+                  className="flex items-center gap-2 px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white text-sm font-semibold rounded-xl transition cursor-pointer shadow-sm">
+                  <CheckCheck size={15} /> Mark All Read
+                </button>
+              )}
+              <button onClick={handleClearAll}
+                className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 hover:bg-red-50 hover:text-red-500 hover:border-red-200 text-gray-600 text-sm font-semibold rounded-xl transition cursor-pointer shadow-sm">
+                <Trash2 size={15} /> Clear All
+              </button>
+            </div>
           </div>
-        ))
+
+          <div className="flex flex-wrap gap-3 items-center">
+            <div className="relative flex-1 min-w-[220px]">
+              <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+              <input type="text" placeholder="Search by title, message or user ID..."
+                value={search} onChange={(e) => setSearch(e.target.value)}
+                className="w-full pl-9 pr-4 py-2.5 text-sm bg-white border border-gray-200 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-300 transition" />
+            </div>
+            {[
+              { value: typeFilter, set: setTypeFilter, options: ["All Types", "Registration", "Plan Purchase", "Assignment", "Expiry"] },
+              { value: statusFilter, set: setStatusFilter, options: ["All", "Unread", "Read"] },
+            ].map(({ value, set, options }, i) => (
+              <div key={i} className="relative">
+                <select value={value} onChange={(e) => set(e.target.value)}
+                  className="appearance-none pl-4 pr-10 py-2.5 text-sm bg-white border border-gray-200 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-300 cursor-pointer text-gray-700 font-medium">
+                  {options.map((o) => <option key={o}>{o}</option>)}
+                </select>
+                <ChevronDown size={13} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+              </div>
+            ))}
+            <input type="date" value={dateFilter} onChange={(e) => setDateFilter(e.target.value)}
+              className="py-2.5 px-3 text-sm bg-white border border-gray-200 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-300 text-gray-700" />
+            <button className="flex items-center gap-2 px-4 py-2.5 bg-white border border-gray-200 rounded-xl shadow-sm text-sm font-medium text-gray-600 hover:bg-gray-50 transition cursor-pointer">
+              <SlidersHorizontal size={14} />
+            </button>
+            {hasFilters && (
+              <button onClick={() => { setSearch(""); setTypeFilter("All Types"); setStatusFilter("All"); setDateFilter(""); }}
+                className="flex items-center gap-1.5 px-3 py-2.5 text-xs font-semibold text-gray-500 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition cursor-pointer">
+                <X size={13} /> Clear
+              </button>
+            )}
+          </div>
+
+          {Object.keys(grouped).length === 0 ? (
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm py-20 text-center">
+              <Bell size={32} className="text-gray-200 mx-auto mb-3" />
+              <p className="text-sm text-gray-400 font-medium">No notifications found.</p>
+            </div>
+          ) : (
+            Object.entries(grouped).map(([label, items]) => (
+              <div key={label} className="space-y-2">
+                <p className="text-xs font-bold text-gray-400 tracking-widest px-1">{label}</p>
+                {items.map((n) => <NotificationCard key={n.id} n={n} onMarkRead={handleMarkRead} />)}
+              </div>
+            ))
+          )}
+        </>
       )}
     </div>
   );

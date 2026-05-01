@@ -3,7 +3,7 @@ import {
   Search, ChevronDown, X, CheckCircle, Users,
   Filter, SlidersHorizontal, Loader2
 } from "lucide-react";
-import { getNutritionists, assignNutritionist, getSubscribedUsers } from "../api/users";
+import { getNutritionists, assignNutritionist, getEligibleUsersForNutritionist } from "../api/users";
 
 const INITIALS_COLORS = [
   "bg-orange-100 text-orange-600", "bg-blue-100 text-blue-600",
@@ -137,10 +137,31 @@ function DetailsModal({ profile, onClose, onAssign }) {
 function AssignModal({ profile, patients, onClose, onConfirm }) {
   const [selected, setSelected] = useState("");
   const [notify, setNotify] = useState(true);
+  const [filteredPatients, setFilteredPatients] = useState([]);
+  const [loading, setLoading] = useState(false);
+  
   const initials = profile.user_name
     ? profile.user_name.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase()
     : `N${profile.id}`;
   const colorClass = INITIALS_COLORS[profile.id % INITIALS_COLORS.length];
+
+  // Filter patients based on nutritionist type
+  useEffect(() => {
+    const filterPatients = async () => {
+      try {
+        setLoading(true);
+        const data = await getEligibleUsersForNutritionist(profile.nutritionist_type);
+        setFilteredPatients(data.users || []);
+      } catch (error) {
+        console.error('Error fetching eligible users:', error);
+        setFilteredPatients([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    filterPatients();
+  }, [profile.nutritionist_type]);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
@@ -166,14 +187,28 @@ function AssignModal({ profile, patients, onClose, onConfirm }) {
 
         <div className="mt-4 mb-1">
           <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Patient</p>
-          <div className="relative">
-            <select value={selected} onChange={(e) => setSelected(e.target.value)}
-              className="w-full appearance-none pl-4 pr-8 py-3 text-sm bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-300 cursor-pointer text-gray-700">
-              <option value="">Select a patient...</option>
-              {patients.map((p) => <option key={p.id} value={p.id}>{p.full_name} (#{p.id})</option>)}
-            </select>
-            <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-          </div>
+          {loading ? (
+            <div className="flex items-center justify-center py-4">
+              <Loader2 size={16} className="animate-spin text-orange-400" />
+            </div>
+          ) : filteredPatients.length === 0 ? (
+            <div className="w-full py-3 px-4 text-sm text-gray-500 bg-gray-50 rounded-xl text-center">
+              No eligible patients available
+            </div>
+          ) : (
+            <div className="relative">
+              <select value={selected} onChange={(e) => setSelected(e.target.value)}
+                className="w-full appearance-none pl-4 pr-8 py-3 text-sm bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-300 cursor-pointer text-gray-700">
+                <option value="">Select a patient...</option>
+                {filteredPatients.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.full_name} (Plan: {p.plan_name})
+                  </option>
+                ))}
+              </select>
+              <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+            </div>
+          )}
         </div>
 
         <label className="flex items-center gap-3 mt-4 cursor-pointer">
@@ -185,7 +220,7 @@ function AssignModal({ profile, patients, onClose, onConfirm }) {
         </label>
 
         <div className="flex flex-col gap-2 mt-5">
-          <button disabled={!selected} onClick={() => onConfirm(profile, selected, notify)}
+          <button disabled={!selected || loading} onClick={() => onConfirm(profile, selected, notify)}
             className="w-full py-3 bg-orange-500 hover:bg-orange-600 text-white text-sm font-bold rounded-xl transition cursor-pointer disabled:opacity-50">
             Confirm Assignment
           </button>
@@ -201,7 +236,6 @@ function AssignModal({ profile, patients, onClose, onConfirm }) {
 
 export default function Nutritionists() {
   const [nutritionists, setNutritionists] = useState([]);
-  const [patients, setPatients] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState("All Types");
@@ -216,18 +250,18 @@ export default function Nutritionists() {
       .then((data) => setNutritionists(data.data || []))
       .catch(() => setNutritionists([]))
       .finally(() => setLoading(false));
-
-    getSubscribedUsers()
-      .then((list) => setPatients(list))
-      .catch(() => setPatients([]));
   }, []);
 
   const handleConfirmAssign = async (profile, patientId, notify) => {
     try {
       await assignNutritionist(patientId, profile.user_id);
-      const patient = patients.find((p) => p.id === parseInt(patientId));
       setAssignModal(null);
-      showToast(`${profile.user_name || "Nutritionist"} assigned to ${patient?.full_name || "Patient"}${notify ? " · Notification sent" : ""}`);
+      showToast(`${profile.user_name || "Nutritionist"} assigned successfully${notify ? " · Notification sent" : ""}`);
+      
+      // Refresh nutritionists list to show updated patient count
+      getNutritionists()
+        .then((data) => setNutritionists(data.data || []))
+        .catch(() => console.error("Failed to refresh nutritionists"));
     } catch (err) {
       showToast("Assignment failed: " + err.message);
     }
@@ -251,7 +285,7 @@ export default function Nutritionists() {
     <div className="p-6 space-y-5 bg-gray-50 min-h-screen">
       {toast && <Toast message={toast} onClose={() => setToast(null)} />}
       {detailsModal && <DetailsModal profile={detailsModal} onClose={() => setDetailsModal(null)} onAssign={setAssignModal} />}
-      {assignModal && <AssignModal profile={assignModal} patients={patients} onClose={() => setAssignModal(null)} onConfirm={handleConfirmAssign} />}
+      {assignModal && <AssignModal profile={assignModal} onClose={() => setAssignModal(null)} onConfirm={handleConfirmAssign} />}
 
       <div className="flex items-start justify-between flex-wrap gap-4">
         <div>
