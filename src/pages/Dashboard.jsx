@@ -75,13 +75,16 @@ export default function Dashboard({ pageState }) {
 
   // Fetch plans map once
   useEffect(() => {
-    fetch("/api/subscription/plans/")
+    fetch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'}/api/subscription/plans/`)
       .then(r => r.ok ? r.json() : [])
       .then(list => {
         const m = {};
         (Array.isArray(list) ? list : []).forEach(p => { m[p.id] = p.name; });
         setPlansMap(m);
-      }).catch(() => {});
+      })
+      .catch((err) => {
+        console.error('Plans fetch error:', err);
+      });
   }, []);
 
   useEffect(() => {
@@ -103,7 +106,8 @@ export default function Dashboard({ pageState }) {
           pendingAppts: res.pendingAppts ?? 0,
           growthData: res.userGrowth?.length ? res.userGrowth : [],
           planDist: (res.planDistribution ?? []).map((p, i) => {
-            const planName = plansMap[p.plan_id] || plansMap[p.plan] || p.plan || `Plan ${p.plan_id}`;
+            // Use plan_name from backend response, fallback to plansMap
+            const planName = p.plan_name || plansMap[p.plan_id] || plansMap[p.plan] || p.plan || `Plan ${p.plan_id}`;
             return {
               name: planName,
               value: p.users ?? p.count ?? 0,
@@ -120,7 +124,8 @@ export default function Dashboard({ pageState }) {
         });
       })
       .catch((err) => {
-        console.error(err);
+        console.error('Dashboard data fetch error:', err);
+        console.error('Error details:', err.message);
         setData(null);
       })
       .finally(() => setLoading(false));

@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Calendar, ChevronDown, Search, CheckCircle, Clock, Filter, XCircle, ChevronLeft, ChevronRight } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts";
 import { getPayments, getPaymentAnalytics } from "../api/payments";
+import { API_BASE_URL } from "../config";
 
 const PLAN_COLORS = {
   Basic: "bg-blue-50 text-blue-600",
@@ -39,13 +40,16 @@ export default function SubscriptionPayments() {
 
   // load plans map for chart
   useEffect(() => {
-    fetch("/api/subscription/plans/")
+    fetch(`${API_BASE_URL}/api/subscription/plans/`)
       .then(r => r.ok ? r.json() : [])
       .then(list => {
         const m = {};
         (Array.isArray(list) ? list : []).forEach(p => { m[p.id] = p.name; });
         setPlansMap(m);
-      }).catch(() => {});
+      })
+      .catch((err) => {
+        console.error('Plans fetch error:', err);
+      });
   }, []);
 
   const buildParams = useCallback(() => {
@@ -82,16 +86,23 @@ export default function SubscriptionPayments() {
   useEffect(() => {
     const params = buildParams();
     getPaymentAnalytics(params)
-      .then(d => setAnalytics({
-        totalRevenue: d.totalRevenue || 0,
-        successPayments: d.successPayments || 0,
-        failedPayments: d.failedPayments || 0,
-        revenuePerPlan: d.revenuePerPlan || [],
-      })).catch(() => {});
+      .then(d => {
+        console.log('Analytics data received:', d);
+        setAnalytics({
+          totalRevenue: d.totalRevenue || 0,
+          successPayments: d.successPayments || 0,
+          failedPayments: d.failedPayments || 0,
+          revenuePerPlan: d.revenuePerPlan || [],
+        });
+      })
+      .catch((err) => {
+        console.error('Analytics fetch error:', err);
+        setAnalytics({ totalRevenue: 0, successPayments: 0, failedPayments: 0, revenuePerPlan: [] });
+      });
   }, [buildParams]);
 
   const chartData = analytics.revenuePerPlan.map(p => ({
-    label: plansMap[p.plan_id] || `Plan ${p.plan_id}`,
+    label: p.plan_name || plansMap[p.plan_id] || `Plan ${p.plan_id}`,
     revenue: p.revenue,
   }));
 
