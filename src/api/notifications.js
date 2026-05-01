@@ -1,6 +1,6 @@
 import { API_BASE_URL } from '../config';
 
-const BASE = `${API_BASE_URL}/api/notifications`;
+const BASE = `${API_BASE_URL}/api`;
 
 export const getAdminNotifications = async (type = "admin") => {
   const res = await fetch(`${BASE}/admin-notifications/?type=${type}`);

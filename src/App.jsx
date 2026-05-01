@@ -7,6 +7,8 @@ import SubscriptionPlans from "./pages/SubscriptionPlans";
 import SubscriptionPayments from "./pages/SubscriptionPayments";
 import Notifications from "./pages/Notifications";
 import Nutritionists from "./pages/Nutritionists";
+import DietPlansMain from "./pages/DietPlansMain";
+import CreateEditDietPlan from "./pages/CreateEditDietPlan";
 
 function PlaceholderPage({ title }) {
   return (
@@ -24,7 +26,7 @@ export default function App() {
 
   // Fetch unread notification count on load
   useEffect(() => {
-    fetch(`${import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000'}/api/notifications/admin-notifications/`)
+    fetch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'}/api/notifications/admin-notifications/`)
       .then(r => r.ok ? r.json() : { results: [] })
       .then(data => {
         const list = data.results || [];
@@ -56,7 +58,8 @@ export default function App() {
       case "nutritionists": return <Nutritionists />;
       case "notifications": return <Notifications onUnreadChange={setUnreadCount} />;
       case "meals": return <PlaceholderPage title="Meals" />;
-      case "diet": return <PlaceholderPage title="Diet Plans" />;
+      case "diet": return <DietPlansMain />;
+      case "createDiet": return <CreateEditDietPlan onBack={() => handleNavigate("diet")} />;
       case "progress": return <PlaceholderPage title="Progress" />;
       case "appointments": return <PlaceholderPage title="Appointments" />;
       case "blogs": return <PlaceholderPage title="Blogs" />;

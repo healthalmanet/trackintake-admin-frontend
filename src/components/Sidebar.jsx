@@ -1,6 +1,6 @@
 import {
   LayoutDashboard, Users, UtensilsCrossed, ClipboardList,
-  TrendingUp, CalendarCheck, BookOpen, Bell, Settings, CreditCard, Stethoscope,
+  TrendingUp, CalendarCheck, BookOpen, Bell, Settings, CreditCard, Stethoscope, Apple,
 } from "lucide-react";
 
 const navItems = [
@@ -10,7 +10,7 @@ const navItems = [
   { icon: CreditCard, label: "Subscription Plans", id: "plans" },
   { icon: CreditCard, label: "Subscription Payments", id: "payments" },
   { icon: UtensilsCrossed, label: "Meals", id: "meals" },
-  { icon: ClipboardList, label: "Diet Plans", id: "diet" },
+  { icon: Apple, label: "Diet Plans", id: "diet" },
   { icon: TrendingUp, label: "Progress", id: "progress" },
   { icon: CalendarCheck, label: "Appointments", id: "appointments" },
   { icon: BookOpen, label: "Blogs", id: "blogs" },

@@ -7,9 +7,9 @@ const getApiBaseUrl = () => {
     return 'https://trackintake-admin-backend.onrender.com';
   }
   
-  // On localhost development
+  // On localhost development - use localhost to match frontend origin
   if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-    return 'http://127.0.0.1:8000';
+    return 'http://localhost:8000';
   }
   
   // Fallback to environment variable

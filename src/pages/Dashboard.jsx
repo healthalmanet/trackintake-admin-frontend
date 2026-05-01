@@ -75,7 +75,7 @@ export default function Dashboard({ pageState }) {
 
   // Fetch plans map once
   useEffect(() => {
-    fetch(`${import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000'}/api/subscription/plans/`)
+    fetch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'}/api/subscription/plans/`)
       .then(r => r.ok ? r.json() : [])
       .then(list => {
         const m = {};
