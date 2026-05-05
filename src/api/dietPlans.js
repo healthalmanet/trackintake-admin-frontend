@@ -28,6 +28,7 @@ export const getDietPlans = async (filters = {}, page = 1, pageSize = 20) => {
   if (filters.user_id) params.append('user_id', filters.user_id);
   if (filters.nutritionist_id) params.append('nutritionist_id', filters.nutritionist_id);
   if (filters.week_starting) params.append('for_week_starting', filters.week_starting);
+  if (filters.search) params.append('search', filters.search);
   
   if (params.toString()) url += `&${params.toString()}`;
   
@@ -176,5 +177,20 @@ export const getNutritionists = async () => {
   } catch (error) {
     console.error('Get nutritionists error:', error);
     return [];
+  }
+};
+
+// Get assigned nutritionist for a patient
+export const getAssignedNutritionist = async (userId) => {
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/users/${userId}/assigned-nutritionist/`);
+    if (!res.ok) {
+      console.warn(`No assigned nutritionist found for user ${userId}`);
+      return null;
+    }
+    return res.json();
+  } catch (error) {
+    console.error('Get assigned nutritionist error:', error);
+    return null;
   }
 };

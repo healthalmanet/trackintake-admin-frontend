@@ -9,6 +9,10 @@ const FEATURE_FIELDS = [
   { key: "nutrition_search_allowed", label: "Nutrition Search" },
   { key: "custom_reminder_allowed", label: "Custom Reminders" },
   { key: "chat_allowed", label: "Chat" },
+  { key: "Fat_Calculator_allowed", label: "Fat Calculator" },
+  { key: "BMI_Calculator_allowed", label: "BMI Calculator" },
+  { key: "meal_log_allowed", label: "Meal Log" },
+  { key: "water_intake_allowed", label: "Water Intake Tracker" },
 ];
 
 const EMPTY_FORM = {
@@ -18,12 +22,19 @@ const EMPTY_FORM = {
   inhouse_consults: 0,
   expert_consults: 0,
   is_active: true,
+  plan_type: "user",
   appointment_allowed: false,
   ai_diet_allowed: false,
   weight_tracker_allowed: false,
   nutrition_search_allowed: false,
   custom_reminder_allowed: false,
   chat_allowed: false,
+  Fat_Calculator_allowed: false,
+  BMI_Calculator_allowed: false,
+  meal_log_allowed: false,
+  water_intake_allowed: false,
+  expert_consultation_fee: 0,
+  inhouse_consultation_fee: 0,
 };
 
 const planAccentColors = [
@@ -45,7 +56,9 @@ export default function SubscriptionPlans() {
     setError("");
     try {
       const data = await api.getPlans();
-      setPlans(data);
+      // Sort plans by ID in descending order (newest first)
+      const sorted = [...data].sort((a, b) => b.id - a.id);
+      setPlans(sorted);
     } catch (e) {
       setError(e.message);
     } finally {
@@ -127,6 +140,13 @@ function PlanCard({ plan, accent, onEdit, onToggleActive, isToggling }) {
             <div className="flex items-center gap-2">
               {plan.is_active && <Crown size={14} className="text-orange-500" />}
               <h3 className="text-lg font-bold text-gray-900">{plan.name}</h3>
+              <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
+                plan.plan_type === "nutritionist"
+                  ? "bg-purple-100 text-purple-700"
+                  : "bg-blue-100 text-blue-700"
+              }`}>
+                {plan.plan_type === "nutritionist" ? "Nutritionist" : "Patient"}
+              </span>
             </div>
             <p className="text-2xl font-bold text-orange-500 mt-1">
               Rs {plan.price?.toLocaleString()}
@@ -189,10 +209,21 @@ function PlanModal({ mode, plan, onClose, onSave }) {
     e.preventDefault();
     setSaving(true);
     try {
+      // Convert numeric fields to numbers
+      const submitData = {
+        ...form,
+        price: parseInt(form.price) || 0,
+        duration_days: parseInt(form.duration_days) || 0,
+        inhouse_consults: parseInt(form.inhouse_consults) || 0,
+        expert_consults: parseInt(form.expert_consults) || 0,
+        inhouse_consultation_fee: parseInt(form.inhouse_consultation_fee) || 0,
+        expert_consultation_fee: parseInt(form.expert_consultation_fee) || 0,
+      };
+
       if (mode === "edit") {
-        await api.updatePlan(plan.id, form);
+        await api.updatePlan(plan.id, submitData);
       } else {
-        await api.createPlan(form);
+        await api.createPlan(submitData);
       }
       onSave();
     } catch (err) {
@@ -213,6 +244,35 @@ function PlanModal({ mode, plan, onClose, onSave }) {
         </div>
 
         <form onSubmit={handleSubmit} className="p-5 space-y-4">
+          {/* Plan Type Selection */}
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-2">Plan Type</label>
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => set("plan_type", "user")}
+                className={`px-4 py-3 rounded-lg border-2 font-medium text-sm transition cursor-pointer ${
+                  form.plan_type === "user"
+                    ? "border-orange-500 bg-orange-50 text-orange-700"
+                    : "border-gray-200 bg-white text-gray-600 hover:border-gray-300"
+                }`}
+              >
+                👤 Patient Plan
+              </button>
+              <button
+                type="button"
+                onClick={() => set("plan_type", "nutritionist")}
+                className={`px-4 py-3 rounded-lg border-2 font-medium text-sm transition cursor-pointer ${
+                  form.plan_type === "nutritionist"
+                    ? "border-orange-500 bg-orange-50 text-orange-700"
+                    : "border-gray-200 bg-white text-gray-600 hover:border-gray-300"
+                }`}
+              >
+                👨‍⚕️ Nutritionist Plan
+              </button>
+            </div>
+          </div>
+
           {/* Basic fields */}
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -238,6 +298,16 @@ function PlanModal({ mode, plan, onClose, onSave }) {
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">Expert Consults</label>
               <input type="number" min="0" value={form.expert_consults} onChange={(e) => set("expert_consults", e.target.value)}
+                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-300" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">In-house Consultation Fee (Rs)</label>
+              <input type="number" min="0" value={form.inhouse_consultation_fee} onChange={(e) => set("inhouse_consultation_fee", e.target.value)}
+                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-300" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Expert Consultation Fee (Rs)</label>
+              <input type="number" min="0" value={form.expert_consultation_fee} onChange={(e) => set("expert_consultation_fee", e.target.value)}
                 className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-300" />
             </div>
           </div>
