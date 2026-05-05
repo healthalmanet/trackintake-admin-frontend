@@ -178,3 +178,18 @@ export const getNutritionists = async () => {
     return [];
   }
 };
+
+// Get assigned nutritionist for a patient
+export const getAssignedNutritionist = async (userId) => {
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/users/${userId}/assigned-nutritionist/`);
+    if (!res.ok) {
+      console.warn(`No assigned nutritionist found for user ${userId}`);
+      return null;
+    }
+    return res.json();
+  } catch (error) {
+    console.error('Get assigned nutritionist error:', error);
+    return null;
+  }
+};

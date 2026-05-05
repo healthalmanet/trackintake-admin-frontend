@@ -8,7 +8,6 @@ import SubscriptionPayments from "./pages/SubscriptionPayments";
 import Notifications from "./pages/Notifications";
 import Nutritionists from "./pages/Nutritionists";
 import DietPlansMain from "./pages/DietPlansMain";
-import CreateEditDietPlan from "./pages/CreateEditDietPlan";
 
 function PlaceholderPage({ title }) {
   return (
@@ -59,7 +58,6 @@ export default function App() {
       case "notifications": return <Notifications onUnreadChange={setUnreadCount} />;
       case "meals": return <PlaceholderPage title="Meals" />;
       case "diet": return <DietPlansMain />;
-      case "createDiet": return <CreateEditDietPlan onBack={() => handleNavigate("diet")} />;
       case "progress": return <PlaceholderPage title="Progress" />;
       case "appointments": return <PlaceholderPage title="Appointments" />;
       case "blogs": return <PlaceholderPage title="Blogs" />;
