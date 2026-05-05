@@ -28,6 +28,7 @@ export const getDietPlans = async (filters = {}, page = 1, pageSize = 20) => {
   if (filters.user_id) params.append('user_id', filters.user_id);
   if (filters.nutritionist_id) params.append('nutritionist_id', filters.nutritionist_id);
   if (filters.week_starting) params.append('for_week_starting', filters.week_starting);
+  if (filters.search) params.append('search', filters.search);
   
   if (params.toString()) url += `&${params.toString()}`;
   

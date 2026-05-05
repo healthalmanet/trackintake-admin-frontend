@@ -1,5 +1,5 @@
 import {
-  LayoutDashboard, Users, UtensilsCrossed, ClipboardList,
+  LayoutDashboard, Users, UtensilsCrossed,
   TrendingUp, CalendarCheck, BookOpen, Bell, Settings, CreditCard, Stethoscope, Apple,
 } from "lucide-react";
 
@@ -49,7 +49,10 @@ export default function Sidebar({ active, onNavigate }) {
         })}
       </nav>
 
-      {/* Logout removed */}
+      {/* Logout */}
+      <div className="px-3 py-4 border-t border-gray-100">
+        {/* Logout button removed - will be added back later */}
+      </div>
     </aside>
   );
 }
