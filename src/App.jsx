@@ -8,7 +8,7 @@ import SubscriptionPayments from "./pages/SubscriptionPayments";
 import Notifications from "./pages/Notifications";
 import Nutritionists from "./pages/Nutritionists";
 import DietPlansMain from "./pages/DietPlansMain";
-import CreateEditDietPlan from "./pages/CreateEditDietPlan";
+import AdminLogin from "./pages/AdminLogin";
 
 function PlaceholderPage({ title }) {
   return (
@@ -23,9 +23,18 @@ export default function App() {
   const [activePage, setActivePage] = useState(() => sessionStorage.getItem("activePage") || "dashboard");
   const [pageState, setPageState] = useState({});
   const [unreadCount, setUnreadCount] = useState(0);
+  const [isAuthenticated, setIsAuthenticated] = useState(() => {
+    return localStorage.getItem("isAdmin") === "true";
+  });
+  const [user, setUser] = useState(() => {
+    const stored = localStorage.getItem("user");
+    return stored ? JSON.parse(stored) : null;
+  });
 
   // Fetch unread notification count on load
   useEffect(() => {
+    if (!isAuthenticated) return;
+    
     fetch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'}/api/notifications/admin-notifications/`)
       .then(r => r.ok ? r.json() : { results: [] })
       .then(data => {
@@ -33,7 +42,22 @@ export default function App() {
         setUnreadCount(list.filter(n => !n.is_read).length);
       })
       .catch(() => {});
-  }, []);
+  }, [isAuthenticated]);
+
+  const handleLoginSuccess = (userData) => {
+    setUser(userData);
+    setIsAuthenticated(true);
+    setActivePage("dashboard");
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem("authToken");
+    localStorage.removeItem("user");
+    localStorage.removeItem("isAdmin");
+    setUser(null);
+    setIsAuthenticated(false);
+    setActivePage("dashboard");
+  };
 
   const handleNavigate = (page) => {
     sessionStorage.setItem("activePage", page);
@@ -59,7 +83,6 @@ export default function App() {
       case "notifications": return <Notifications onUnreadChange={setUnreadCount} />;
       case "meals": return <PlaceholderPage title="Meals" />;
       case "diet": return <DietPlansMain />;
-      case "createDiet": return <CreateEditDietPlan onBack={() => handleNavigate("diet")} />;
       case "progress": return <PlaceholderPage title="Progress" />;
       case "appointments": return <PlaceholderPage title="Appointments" />;
       case "blogs": return <PlaceholderPage title="Blogs" />;
@@ -69,14 +92,20 @@ export default function App() {
   };
 
   return (
-    <div className="flex h-screen bg-gray-50 overflow-hidden">
-      <Sidebar active={activePage} onNavigate={handleNavigate} />
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <Navbar unreadCount={unreadCount} onNotificationClick={() => handleNavigate("notifications")} />
-        <main className="flex-1 overflow-y-auto">
-          {renderPage()}
-        </main>
-      </div>
-    </div>
+    <>
+      {!isAuthenticated ? (
+        <AdminLogin onLoginSuccess={handleLoginSuccess} />
+      ) : (
+        <div className="flex h-screen bg-gray-50 overflow-hidden">
+          <Sidebar active={activePage} onNavigate={handleNavigate} />
+          <div className="flex-1 flex flex-col overflow-hidden">
+            <Navbar unreadCount={unreadCount} onNotificationClick={() => handleNavigate("notifications")} onLogout={handleLogout} />
+            <main className="flex-1 overflow-y-auto">
+              {renderPage()}
+            </main>
+          </div>
+        </div>
+      )}
+    </>
   );
 }

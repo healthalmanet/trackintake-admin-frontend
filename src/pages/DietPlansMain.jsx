@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
-import { Plus, Search, Eye, Edit2, MoreVertical, Trash2, Copy, X, Apple } from 'lucide-react';
-import { getDietPlans, getNutritionists, getUsers } from '../api/dietPlans';
+import { useState, useEffect, useRef } from 'react';
+import { Search, Eye, X, Apple } from 'lucide-react';
+import { getDietPlans, getNutritionists, getUsers, getAssignedNutritionist } from '../api/dietPlans';
 
 export default function DietPlansMain() {
   const [plans, setPlans] = useState([]);
@@ -12,9 +12,7 @@ export default function DietPlansMain() {
   // Filters
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
-  const [nutritionistFilter, setNutritionistFilter] = useState('All');
-  const [dateFilter, setDateFilter] = useState('');
-  const [showArchived, setShowArchived] = useState(false);
+  const [nutritionistFilter, setNutritionistFilter] = useState('');
   
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
@@ -22,64 +20,92 @@ export default function DietPlansMain() {
   const [totalCount, setTotalCount] = useState(0);
   const itemsPerPage = 20;
   
-  // Modals
+  // Drawer
   const [viewDrawer, setViewDrawer] = useState(null);
-  const [activeDay, setActiveDay] = useState(0);
+  const [assignedNutritionist, setAssignedNutritionist] = useState(null);
+  const [assignedNutritionistMap, setAssignedNutritionistMap] = useState({});
+  
+  // Debounce ref
+  const searchTimeoutRef = useRef(null);
+  const [debouncedSearch, setDebouncedSearch] = useState('');
 
+  // Initial load
   useEffect(() => {
-    fetchAllData();
-  }, [currentPage]);
+    loadInitialData();
+  }, []);
 
-  const fetchAllData = async () => {
+  // Debounce search
+  useEffect(() => {
+    if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
+    
+    searchTimeoutRef.current = setTimeout(() => {
+      setDebouncedSearch(searchTerm);
+      setCurrentPage(1);
+    }, 500);
+
+    return () => clearTimeout(searchTimeoutRef.current);
+  }, [searchTerm]);
+
+  // Fetch when filters change
+  useEffect(() => {
+    fetchPlans();
+  }, [currentPage, statusFilter, nutritionistFilter, debouncedSearch]);
+
+  const loadInitialData = async () => {
     try {
       setLoading(true);
       await Promise.all([
-        fetchPlans(),
-        fetchAllPlansForStats(),
         fetchNutritionists(),
-        fetchUsers()
+        fetchUsers(),
+        fetchPlans(),
+        fetchAllPlansForStats()
       ]);
     } finally {
       setLoading(false);
     }
   };
 
-  const fetchAllPlansForStats = async () => {
-    try {
-      // Fetch all plans with a large page size to get stats
-      const data = await getDietPlans({}, 1, 1000);
-      if (data.results) {
-        setAllPlans(data.results);
-      } else {
-        const plansArray = Array.isArray(data) ? data : [];
-        setAllPlans(plansArray);
-      }
-    } catch (error) {
-      console.error('Error fetching all plans for stats:', error);
-      setAllPlans([]);
-    }
-  };
-
   const fetchPlans = async () => {
     try {
-      const data = await getDietPlans({}, currentPage, itemsPerPage);
-      // Handle paginated response
+      const filters = {};
+      if (statusFilter && statusFilter !== 'All') filters.status = statusFilter.toLowerCase();
+      if (nutritionistFilter) filters.nutritionist_id = nutritionistFilter;
+      if (debouncedSearch) filters.search = debouncedSearch;
+
+      const data = await getDietPlans(filters, currentPage, itemsPerPage);
+      
       if (data.results) {
         setPlans(data.results);
         setTotalCount(data.count);
-        const total = Math.ceil(data.count / itemsPerPage);
-        setTotalPages(total);
-      } else {
-        const plansArray = Array.isArray(data) ? data : [];
-        setPlans(plansArray);
-        setTotalCount(plansArray.length);
-        setTotalPages(1);
+        setTotalPages(Math.ceil(data.count / itemsPerPage));
+
+        // Fetch assigned nutritionists
+        const nutMap = {};
+        for (const plan of data.results) {
+          try {
+            const assigned = await getAssignedNutritionist(plan.user_id);
+            if (assigned) nutMap[plan.user_id] = assigned.full_name;
+          } catch (error) {
+            console.error(`Error fetching nutritionist for user ${plan.user_id}:`, error);
+          }
+        }
+        setAssignedNutritionistMap(nutMap);
       }
     } catch (error) {
       console.error('Error fetching plans:', error);
       setPlans([]);
       setTotalCount(0);
       setTotalPages(1);
+    }
+  };
+
+  const fetchAllPlansForStats = async () => {
+    try {
+      const data = await getDietPlans({}, 1, 1000);
+      setAllPlans(data.results || []);
+    } catch (error) {
+      console.error('Error fetching stats:', error);
+      setAllPlans([]);
     }
   };
 
@@ -104,53 +130,22 @@ export default function DietPlansMain() {
     }
   };
 
-  // Create user map for O(1) lookups
+  // Helpers
   const userMap = users.reduce((map, user) => {
     map[user.id] = user.full_name || user.username || `User ${user.id}`;
     return map;
   }, {});
 
-  const getUserName = (userId) => {
-    return userMap[userId] || `User ${userId}`;
-  };
-
-  // Create nutritionist map
   const nutritionistMap = nutritionists.reduce((map, nut) => {
     map[nut.id] = nut.full_name || `Nutritionist ${nut.id}`;
     return map;
   }, {});
 
-  const getNutritionistName = (nutritionistId) => {
-    return nutritionistMap[nutritionistId] || 'Unassigned';
-  };
+  const getUserName = (userId) => userMap[userId] || `User ${userId}`;
+  const getNutritionistName = (nutritionistId) => nutritionistMap[nutritionistId] || 'Unassigned';
 
-  // Filter logic - now just for display since backend handles pagination
-  const filteredPlans = plans
-    .filter(plan => {
-      const matchesSearch = !searchTerm || 
-        (plan.user_id?.toString().includes(searchTerm)) ||
-        (plan.for_week_starting?.includes(searchTerm));
-      
-      const planStatus = plan.status ? plan.status.toLowerCase() : '';
-      const filterStatus = statusFilter ? statusFilter.toLowerCase() : 'all';
-      const matchesStatus = filterStatus === 'all' || planStatus === filterStatus;
-      
-      const matchesNutritionist = nutritionistFilter === 'All' || 
-        plan.reviewed_by_id?.toString() === nutritionistFilter;
-      
-      const isArchived = planStatus === 'archived';
-      const matchesArchiveFilter = showArchived ? isArchived : !isArchived;
-      
-      return matchesSearch && matchesStatus && matchesNutritionist && matchesArchiveFilter;
-    });
-
-  // Use paginated plans directly from backend
-  const paginatedPlans = filteredPlans;
-
-  // Calculate stats from all plans
+  // Stats
   const totalPlans = totalCount;
-  const draftPlans = allPlans.filter(p => p.status?.toLowerCase() === 'draft').length;
-  const activePlans = allPlans.filter(p => p.status?.toLowerCase() === 'active').length;
   const approvedPlans = allPlans.filter(p => p.status?.toLowerCase() === 'approved').length;
   const pendingPlans = allPlans.filter(p => p.status?.toLowerCase() === 'pending').length;
   const failedPlans = allPlans.filter(p => p.status?.toLowerCase() === 'failed').length;
@@ -186,17 +181,17 @@ export default function DietPlansMain() {
           <h1 className="text-3xl font-bold text-gray-900 tracking-tight">Diet Plans</h1>
           <div className="flex items-center gap-2 mt-1.5 opacity-80">
             <Apple size={14} className="text-gray-500" />
-            <span className="text-sm text-gray-600 font-medium">Manage weekly diet plans assigned to users</span>
+            <span className="text-sm text-gray-600 font-medium">View weekly diet plans created by nutritionists for users</span>
           </div>
         </div>
       </div>
 
       {/* Stats Row */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-        <StatCard label="Total Plans" value={totalPlans.toString()} change="+12% from last month" color="orange" />
-        <StatCard label="Draft" value={draftPlans.toString()} change="Not yet submitted" color="amber" />
-        <StatCard label="Active" value={activePlans.toString()} change="Currently active" color="emerald" />
+        <StatCard label="Total Plans" value={totalPlans.toString()} change="" color="orange" />
+        <StatCard label="Approved" value={approvedPlans.toString()} change="Successfully approved" color="emerald" />
         <StatCard label="Pending" value={pendingPlans.toString()} change="Awaiting approval" color="amber" />
+        <StatCard label="Failed" value={failedPlans.toString()} change="Processing failed" color="red" />
         <StatCard label="Rejected" value={rejectedPlans.toString()} change="Need revision" color="red" />
       </div>
 
@@ -208,9 +203,6 @@ export default function DietPlansMain() {
             onClick={() => {
               setSearchTerm('');
               setStatusFilter('All');
-              setNutritionistFilter('All');
-              setDateFilter('');
-              setShowArchived(false);
               setCurrentPage(1);
             }}
             className="text-[#F97316] text-sm font-semibold hover:underline"
@@ -223,23 +215,12 @@ export default function DietPlansMain() {
             <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
             <input
               type="text"
-              placeholder="Search by user or plan..."
+              placeholder="Search by user name or nutritionist..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full pl-9 pr-4 py-2 text-sm bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-300 focus:border-orange-400 transition"
             />
           </div>
-
-          <select
-            value={nutritionistFilter}
-            onChange={(e) => setNutritionistFilter(e.target.value)}
-            className="px-4 py-2 text-sm bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-300 focus:border-orange-400 transition cursor-pointer"
-          >
-            <option>All Nutritionists</option>
-            {nutritionists.map(n => (
-              <option key={n.id} value={n.id}>{n.full_name}</option>
-            ))}
-          </select>
 
           <select
             value={statusFilter}
@@ -255,24 +236,6 @@ export default function DietPlansMain() {
             <option value="Failed">Failed</option>
             <option value="Rejected">Rejected</option>
           </select>
-
-          <input
-            type="date"
-            value={dateFilter}
-            onChange={(e) => setDateFilter(e.target.value)}
-            className="px-4 py-2 text-sm bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-300 focus:border-orange-400 transition"
-          />
-
-          <button
-            onClick={() => setShowArchived(!showArchived)}
-            className={`px-4 py-2 text-sm font-semibold rounded-lg transition ${
-              showArchived
-                ? 'bg-[#F97316] text-white'
-                : 'bg-gray-50 border border-gray-200 text-gray-600 hover:bg-gray-100'
-            }`}
-          >
-            {showArchived ? 'Archived' : 'Active'}
-          </button>
         </div>
       </div>
 
@@ -282,16 +245,16 @@ export default function DietPlansMain() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-gray-100 bg-gray-50/80">
-                {["User", "Week", "Nutritionist", "Status", "Created", "Actions"].map((h) => (
+                {["Patient", "Week", "Nutritionist", "Status", "Created", "Actions"].map((h) => (
                   <th key={h} className="text-left px-5 py-3.5 text-xs font-semibold text-gray-500 uppercase tracking-wider">{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
-              {paginatedPlans.length === 0 ? (
+              {plans.length === 0 ? (
                 <tr><td colSpan={6} className="text-center py-16 text-gray-400 text-sm">No plans found.</td></tr>
               ) : (
-                paginatedPlans.map((plan, i) => (
+                plans.map((plan, i) => (
                   <tr key={plan.id} className={`border-b border-gray-50 hover:bg-orange-50/30 transition-colors ${i % 2 === 0 ? "bg-white" : "bg-gray-50/40"}`}>
                     <td className="px-5 py-4">
                       <div className="flex items-center gap-3">
@@ -306,7 +269,7 @@ export default function DietPlansMain() {
                       <div className="text-xs text-gray-500">to {new Date(new Date(plan.for_week_starting).getTime() + 6*24*60*60*1000).toISOString().split('T')[0]}</div>
                     </td>
                     <td className="px-5 py-4 text-gray-600 font-medium">
-                      {getNutritionistName(plan.reviewed_by_id)}
+                      {assignedNutritionistMap[plan.user_id] || getNutritionistName(plan.reviewed_by_id) || 'Unassigned'}
                     </td>
                     <td className="px-5 py-4">
                       <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold ${getStatusColor(plan.status)}`}>
@@ -317,34 +280,17 @@ export default function DietPlansMain() {
                       {plan.created_at ? new Date(plan.created_at).toLocaleDateString("en-US", { month: "short", day: "2-digit", year: "numeric" }) : "—"}
                     </td>
                     <td className="px-5 py-4">
-                      <div className="flex items-center gap-1.5">
-                        <button title="View Details" onClick={() => setViewDrawer(plan)} className="p-2 rounded-lg text-gray-400 hover:bg-orange-50 hover:text-orange-500 transition cursor-pointer">
-                          <Eye size={16} />
-                        </button>
-                        {plan.status?.toLowerCase() === 'rejected' ? (
-                          <>
-                            <button title="Edit & Resubmit" onClick={() => {
-                              window.dispatchEvent(new CustomEvent('app-nav', { detail: { page: 'createDiet', planId: plan.id } }));
-                            }} className="p-2 rounded-lg text-gray-400 hover:bg-green-50 hover:text-green-500 transition cursor-pointer">
-                              <Edit2 size={16} />
-                            </button>
-                            <button title="Duplicate Plan" onClick={() => {
-                              window.dispatchEvent(new CustomEvent('app-nav', { detail: { page: 'createDiet', duplicatePlanId: plan.id } }));
-                            }} className="p-2 rounded-lg text-gray-400 hover:bg-purple-50 hover:text-purple-500 transition cursor-pointer">
-                              <Copy size={16} />
-                            </button>
-                          </>
-                        ) : (
-                          <button title="Edit Plan" onClick={() => {
-                            window.dispatchEvent(new CustomEvent('app-nav', { detail: { page: 'createDiet', planId: plan.id } }));
-                          }} className="p-2 rounded-lg text-gray-400 hover:bg-blue-50 hover:text-blue-500 transition cursor-pointer">
-                            <Edit2 size={16} />
-                          </button>
-                        )}
-                        <button title="More Options" className="p-2 rounded-lg text-gray-400 hover:bg-gray-50 hover:text-gray-600 transition cursor-pointer">
-                          <MoreVertical size={16} />
-                        </button>
-                      </div>
+                      <button 
+                        title="View Details" 
+                        onClick={async () => {
+                          setViewDrawer(plan);
+                          const assigned = await getAssignedNutritionist(plan.user_id);
+                          setAssignedNutritionist(assigned);
+                        }} 
+                        className="p-2 rounded-lg text-gray-400 hover:bg-orange-50 hover:text-orange-500 transition cursor-pointer"
+                      >
+                        <Eye size={16} />
+                      </button>
                     </td>
                   </tr>
                 ))
@@ -355,7 +301,7 @@ export default function DietPlansMain() {
 
         {/* Pagination */}
         <div className="px-5 py-3.5 border-t border-gray-100 flex items-center justify-between text-xs text-gray-500 font-medium">
-          <span>Showing {plans.length > 0 ? (currentPage - 1) * itemsPerPage + 1 : 0}–{Math.min(currentPage * itemsPerPage, plans.length)} of {plans.length} plans</span>
+          <span>Showing {plans.length > 0 ? (currentPage - 1) * itemsPerPage + 1 : 0}–{Math.min(currentPage * itemsPerPage, totalCount)} of {totalCount} plans</span>
           <div className="flex items-center gap-2">
             <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1 || loading}
               className="px-3 py-1.5 border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition cursor-pointer text-sm font-semibold">
@@ -372,7 +318,116 @@ export default function DietPlansMain() {
 
       {/* View Drawer */}
       {viewDrawer && (
-        <ViewPlanDrawer plan={viewDrawer} onClose={() => setViewDrawer(null)} users={users} nutritionists={nutritionists} />
+        <div className="fixed inset-0 z-50">
+          <div className="absolute inset-0 bg-black/40 transition-opacity" onClick={() => setViewDrawer(null)} />
+          
+          <div className="absolute right-0 top-0 bottom-0 w-full max-w-2xl bg-white shadow-2xl overflow-y-auto">
+            <div className="sticky top-0 bg-gradient-to-r from-orange-50 to-orange-100/50 border-b border-orange-200 px-6 py-4 flex items-center justify-between">
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900">Diet Plan Details</h2>
+                <p className="text-sm text-gray-600 mt-1">Complete meal plan for {getUserName(viewDrawer.user_id)}</p>
+              </div>
+              <button onClick={() => setViewDrawer(null)} className="p-2 rounded-lg hover:bg-white transition-colors">
+                <X size={24} className="text-gray-600" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-6">
+              <div>
+                <h3 className="text-lg font-bold text-gray-900 mb-4 border-b-2 border-orange-200 pb-2">Patient Information</h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                    <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Patient Name</p>
+                    <p className="text-lg font-bold text-gray-900 mt-2">{getUserName(viewDrawer.user_id)}</p>
+                  </div>
+                  <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                    <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Status</p>
+                    <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-bold mt-2 ${getStatusColor(viewDrawer.status)}`}>
+                      {viewDrawer.status}
+                    </span>
+                  </div>
+                  <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                    <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Week Starting</p>
+                    <p className="text-lg font-bold text-gray-900 mt-2">{viewDrawer.for_week_starting}</p>
+                  </div>
+                  <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                    <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Week Ending</p>
+                    <p className="text-lg font-bold text-gray-900 mt-2">{new Date(new Date(viewDrawer.for_week_starting).getTime() + 6*24*60*60*1000).toISOString().split('T')[0]}</p>
+                  </div>
+                  <div className="bg-gray-50 rounded-lg p-4 border border-gray-200 col-span-2">
+                    <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Assigned Nutritionist</p>
+                    <p className="text-lg font-bold text-gray-900 mt-2">
+                      {assignedNutritionist?.full_name || getNutritionistName(viewDrawer.reviewed_by_id) || 'Unassigned'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {viewDrawer.meals && (
+                <div>
+                  <h3 className="text-lg font-bold text-gray-900 mb-4 border-b-2 border-orange-200 pb-2">Complete Meal Plan</h3>
+                  <div className="space-y-4">
+                    {Object.entries(viewDrawer.meals).map(([day, meals]) => {
+                      if (day === 'nutrition_summary' || day === 'nutrition_table') return null;
+                      
+                      return (
+                        <div key={day} className="bg-orange-50 rounded-lg p-4 border border-orange-200">
+                          <h4 className="font-bold text-gray-900 mb-3 text-base">{day}</h4>
+                          <div className="space-y-3">
+                            {Object.entries(meals).map(([mealType, meal]) => {
+                              if (mealType === 'nutrition_summary' || mealType === 'nutrition_table') return null;
+                              return meal ? (
+                                <div key={mealType} className="bg-white rounded-lg p-4 border border-orange-100">
+                                  <div className="flex items-start justify-between mb-3">
+                                    <div className="flex-1">
+                                      <p className="font-bold text-gray-900 text-base">{mealType}</p>
+                                      <p className="text-sm text-gray-700 mt-1">{meal.food_name}</p>
+                                      <p className="text-xs text-gray-600 mt-1">{meal.quantity}</p>
+                                    </div>
+                                    <p className="text-base font-bold text-orange-600 whitespace-nowrap ml-4">{meal.Calories} kcal</p>
+                                  </div>
+                                  <div className="grid grid-cols-3 gap-3">
+                                    <div className="bg-red-50 rounded-lg p-3 border border-red-100">
+                                      <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Protein</p>
+                                      <p className="text-lg font-bold text-red-600 mt-1">{meal.Protein_g}g</p>
+                                    </div>
+                                    <div className="bg-blue-50 rounded-lg p-3 border border-blue-100">
+                                      <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Carbs</p>
+                                      <p className="text-lg font-bold text-blue-600 mt-1">{meal.Carbs_g}g</p>
+                                    </div>
+                                    <div className="bg-yellow-50 rounded-lg p-3 border border-yellow-100">
+                                      <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Fat</p>
+                                      <p className="text-lg font-bold text-yellow-600 mt-1">{meal.Fats_g}g</p>
+                                    </div>
+                                  </div>
+                                </div>
+                              ) : null;
+                            })}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {viewDrawer.nutritionist_comment && (
+                <div>
+                  <h3 className="text-lg font-bold text-gray-900 mb-4 border-b-2 border-blue-200 pb-2">Nutritionist Comment</h3>
+                  <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
+                    <p className="text-gray-700 leading-relaxed">{viewDrawer.nutritionist_comment}</p>
+                  </div>
+                </div>
+              )}
+
+              <div className="flex gap-3 pt-4 border-t border-gray-200">
+                <button onClick={() => setViewDrawer(null)} className="flex-1 px-4 py-3 border border-gray-300 text-gray-700 rounded-lg font-semibold hover:bg-gray-50 transition-colors">
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
@@ -391,118 +446,6 @@ function StatCard({ label, value, change, color }) {
       <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide">{label}</p>
       <p className={`text-3xl font-extrabold tracking-tight mt-2 ${colorMap[color].text}`}>{value}</p>
       <p className="text-xs text-gray-600 mt-1">{change}</p>
-    </div>
-  );
-}
-
-function ViewPlanDrawer({ plan, onClose, users, nutritionists }) {
-  const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-  const [activeDay, setActiveDay] = useState(0);
-
-  const userMap = users.reduce((map, user) => {
-    map[user.id] = user.full_name || user.username || `User ${user.id}`;
-    return map;
-  }, {});
-
-  const nutritionistMap = nutritionists.reduce((map, nut) => {
-    map[nut.id] = nut.full_name || `Nutritionist ${nut.id}`;
-    return map;
-  }, {});
-
-  const getUserName = (userId) => {
-    return userMap[userId] || `User ${userId}`;
-  };
-
-  const getNutritionistName = (nutritionistId) => {
-    return nutritionistMap[nutritionistId] || 'Unassigned';
-  };
-
-  return (
-    <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-        {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-100 bg-gray-50/50 sticky top-0">
-          <div>
-            <h2 className="text-xl font-bold text-gray-900">Weekly Plan — {getUserName(plan.user_id)}</h2>
-            <p className="text-sm font-medium text-gray-400 mt-0.5">{plan.for_week_starting} to {new Date(new Date(plan.for_week_starting).getTime() + 6*24*60*60*1000).toISOString().split('T')[0]}</p>
-          </div>
-          <button onClick={onClose} className="p-2 rounded-xl bg-white border border-gray-200 hover:bg-gray-50 transition cursor-pointer shadow-sm">
-            <X size={18} className="text-gray-500" />
-          </button>
-        </div>
-
-        <div className="p-6 space-y-6">
-          {/* Status Badge */}
-          <div>
-            <span className="inline-block px-3 py-1 rounded-full text-sm font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-              ✓ {plan.status}
-            </span>
-          </div>
-
-          {/* Patient Info */}
-          <div>
-            <h3 className="text-base font-bold text-gray-800 mb-3 border-b-2 border-orange-100 pb-2 inline-block">Patient Info</h3>
-            <div className="grid grid-cols-3 gap-3">
-              <div className="bg-gray-50 rounded-xl px-4 py-3 border border-gray-100">
-                <p className="text-xs font-bold text-gray-400 uppercase tracking-wide">Name</p>
-                <p className="text-sm font-bold text-gray-800 mt-1">{getUserName(plan.user_id)}</p>
-              </div>
-              <div className="bg-gray-50 rounded-xl px-4 py-3 border border-gray-100">
-                <p className="text-xs font-bold text-gray-400 uppercase tracking-wide">Status</p>
-                <p className="text-sm font-bold text-gray-800 mt-1">{plan.status}</p>
-              </div>
-              <div className="bg-gray-50 rounded-xl px-4 py-3 border border-gray-100">
-                <p className="text-xs font-bold text-gray-400 uppercase tracking-wide">Week</p>
-                <p className="text-sm font-bold text-gray-800 mt-1">{plan.for_week_starting}</p>
-              </div>
-              <div className="bg-gray-50 rounded-xl px-4 py-3 border border-gray-100 col-span-2">
-                <p className="text-xs font-bold text-gray-400 uppercase tracking-wide">Assigned To</p>
-                <p className="text-sm font-bold text-gray-800 mt-1">{getNutritionistName(plan.reviewed_by_id)}</p>
-              </div>
-            </div>
-          </div>
-
-          {/* Meals Info */}
-          {plan.meals && (
-            <div>
-              <h3 className="text-base font-bold text-gray-800 mb-3 border-b-2 border-orange-100 pb-2 inline-block">Meal Plan</h3>
-              <div className="bg-orange-50 rounded-lg p-4 border border-orange-100">
-                <p className="text-sm text-gray-700">
-                  {plan.meals && typeof plan.meals === 'object' ? (
-                    <span>Plan contains {Object.keys(plan.meals).length} days of meals</span>
-                  ) : (
-                    <span>Meal data available</span>
-                  )}
-                </p>
-              </div>
-            </div>
-          )}
-
-          {/* Nutritionist Comment */}
-          {plan.nutritionist_comment && (
-            <div>
-              <h3 className="text-base font-bold text-gray-800 mb-3 border-b-2 border-orange-100 pb-2 inline-block">Nutritionist Comment</h3>
-              <div className="bg-blue-50 rounded-lg p-4 border border-blue-100">
-                <p className="text-sm text-gray-700">{plan.nutritionist_comment}</p>
-              </div>
-            </div>
-          )}
-
-          {/* Action Buttons */}
-          <div className="flex gap-3 pt-4">
-            <button 
-              onClick={() => {
-                window.dispatchEvent(new CustomEvent('app-nav', { detail: { page: 'createDiet', planId: plan.id } }));
-              }}
-              className="flex-1 px-4 py-2 border border-[#F97316] text-[#F97316] rounded-lg font-semibold hover:bg-orange-50 transition-colors">
-              Edit Plan
-            </button>
-            <button className="flex-1 px-4 py-2 bg-[#F97316] text-white rounded-lg font-semibold hover:bg-orange-600 transition-colors">
-              Send to User
-            </button>
-          </div>
-        </div>
-      </div>
     </div>
   );
 }

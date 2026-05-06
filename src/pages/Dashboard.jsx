@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import {
   Users, UserCheck, CalendarCheck, IndianRupee,
-  TrendingUp, TrendingDown, Loader2, Calendar as CalendarIcon, Clock, Activity, BarChart2, ChevronDown
+  TrendingUp, TrendingDown, Loader2, Calendar as CalendarIcon, Clock, Activity, BarChart2, ChevronDown, PieChart as PieChartIcon
 } from "lucide-react";
 import {
   LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer,
@@ -248,25 +248,33 @@ export default function Dashboard({ pageState }) {
                   <p className="text-xs font-medium text-gray-400 mt-0.5">Earnings across selected period</p>
                 </div>
               </div>
-              <ResponsiveContainer width="100%" height={260}>
-                <AreaChart data={data?.revenueTrend} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                  <defs>
-                    <linearGradient id="colorRev" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#f97316" stopOpacity={0.3}/>
-                      <stop offset="95%" stopColor="#f97316" stopOpacity={0}/>
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
-                  <XAxis dataKey="month" tick={{ fontSize: 12, fill: "#9ca3af", fontWeight: 500 }} axisLine={false} tickLine={false} tickMargin={10} />
-                  <YAxis tick={{ fontSize: 12, fill: "#9ca3af", fontWeight: 500 }} axisLine={false} tickLine={false} tickFormatter={(val) => `${val/1000}k`} />
-                  <Tooltip 
-                    contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)', fontWeight: 600 }}
-                    formatter={(v) => [`Rs ${v.toLocaleString()}`, "Revenue"]} 
-                    cursor={{ stroke: "#fb923c", strokeWidth: 1, strokeDasharray: "4 4" }} 
-                  />
-                  <Area type="monotone" dataKey="revenue" stroke="#f97316" strokeWidth={3} fillOpacity={1} fill="url(#colorRev)" activeDot={{ r: 6, fill: "#ea580c", stroke: "#fff", strokeWidth: 2 }} />
-                </AreaChart>
-              </ResponsiveContainer>
+              {data?.revenueTrend && data.revenueTrend.length > 0 ? (
+                <ResponsiveContainer width="100%" height={260}>
+                  <AreaChart data={data.revenueTrend} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="colorRev" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#f97316" stopOpacity={0.3}/>
+                        <stop offset="95%" stopColor="#f97316" stopOpacity={0}/>
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
+                    <XAxis dataKey="month" tick={{ fontSize: 12, fill: "#9ca3af", fontWeight: 500 }} axisLine={false} tickLine={false} tickMargin={10} />
+                    <YAxis tick={{ fontSize: 12, fill: "#9ca3af", fontWeight: 500 }} axisLine={false} tickLine={false} tickFormatter={(val) => `${val/1000}k`} />
+                    <Tooltip 
+                      contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)', fontWeight: 600 }}
+                      formatter={(v) => [`Rs ${v.toLocaleString()}`, "Revenue"]} 
+                      cursor={{ stroke: "#fb923c", strokeWidth: 1, strokeDasharray: "4 4" }} 
+                    />
+                    <Area type="monotone" dataKey="revenue" stroke="#f97316" strokeWidth={3} fillOpacity={1} fill="url(#colorRev)" activeDot={{ r: 6, fill: "#ea580c", stroke: "#fff", strokeWidth: 2 }} />
+                  </AreaChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="flex flex-col items-center justify-center h-64 text-center">
+                  <BarChart2 size={48} className="text-gray-300 mb-3" />
+                  <p className="text-gray-500 font-semibold">No revenue data available</p>
+                  <p className="text-gray-400 text-sm mt-1">Revenue will appear once users purchase subscription plans</p>
+                </div>
+              )}
             </div>
 
             {/* User Growth */}
@@ -301,24 +309,34 @@ export default function Dashboard({ pageState }) {
             <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 hover:shadow-md transition-shadow flex flex-col">
               <h3 className="font-bold text-lg text-gray-900 mb-1">Plan Distribution</h3>
               <p className="text-xs font-medium text-gray-400 mb-6">Active subscription split</p>
-              <div className="flex justify-center flex-1">
-                <PieChart width={180} height={180}>
-                  <Pie data={data?.planDist} cx={90} cy={90} innerRadius={56} outerRadius={86} paddingAngle={4} dataKey="value" stroke="none" animationDuration={1000}>
-                    {data?.planDist.map((e) => <Cell key={e.name} fill={e.color} />)}
-                  </Pie>
-                  <Tooltip formatter={(value, name, props) => [`${value} users (${props.payload.pct}%)`, name]} contentStyle={{borderRadius:8, border:"none", boxShadow:"0 4px 6px -1px rgb(0 0 0 / 0.1)"}}/>
-                </PieChart>
-              </div>
-              <div className="space-y-3 mt-4">
-                {data?.planDist.map((p) => (
-                  <div key={p.name} className="flex items-center gap-3">
-                    <span className="w-2.5 h-2.5 rounded-full shrink-0 shadow-sm" style={{ background: p.color }} />
-                    <span className="text-sm font-semibold text-gray-700 flex-1">{p.name}</span>
-                    <span className="text-sm font-bold text-gray-900 w-10 text-right">{p.value}</span>
-                    <span className="text-xs font-medium text-gray-400 w-10 text-right bg-gray-50 py-0.5 rounded-md">{p.pct}%</span>
+              {data?.planDist && data.planDist.length > 0 ? (
+                <>
+                  <div className="flex justify-center flex-1">
+                    <PieChart width={180} height={180}>
+                      <Pie data={data.planDist} cx={90} cy={90} innerRadius={56} outerRadius={86} paddingAngle={4} dataKey="value" stroke="none" animationDuration={1000}>
+                        {data.planDist.map((e) => <Cell key={e.name} fill={e.color} />)}
+                      </Pie>
+                      <Tooltip formatter={(value, name, props) => [`${value} users (${props.payload.pct}%)`, name]} contentStyle={{borderRadius:8, border:"none", boxShadow:"0 4px 6px -1px rgb(0 0 0 / 0.1)"}}/>
+                    </PieChart>
                   </div>
-                ))}
-              </div>
+                  <div className="space-y-3 mt-4">
+                    {data.planDist.map((p) => (
+                      <div key={p.name} className="flex items-center gap-3">
+                        <span className="w-2.5 h-2.5 rounded-full shrink-0 shadow-sm" style={{ background: p.color }} />
+                        <span className="text-sm font-semibold text-gray-700 flex-1">{p.name}</span>
+                        <span className="text-sm font-bold text-gray-900 w-10 text-right">{p.value}</span>
+                        <span className="text-xs font-medium text-gray-400 w-10 text-right bg-gray-50 py-0.5 rounded-md">{p.pct}%</span>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              ) : (
+                <div className="flex flex-col items-center justify-center h-64 text-center">
+                  <PieChartIcon size={48} className="text-gray-300 mb-3" />
+                  <p className="text-gray-500 font-semibold">No subscription data</p>
+                  <p className="text-gray-400 text-sm mt-1">Plan distribution will appear once users purchase plans</p>
+                </div>
+              )}
             </div>
 
             {/* Meals Logged */}
