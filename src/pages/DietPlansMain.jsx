@@ -48,6 +48,7 @@ export default function DietPlansMain() {
 
   // Fetch when filters change
   useEffect(() => {
+    setAssignedNutritionistMap({}); // Clear the map when filters change
     fetchPlans();
   }, [currentPage, statusFilter, nutritionistFilter, debouncedSearch]);
 
