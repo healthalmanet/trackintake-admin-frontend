@@ -22,7 +22,7 @@ const EMPTY_FORM = {
   inhouse_consults: 0,
   expert_consults: 0,
   is_active: true,
-  plan_type: "user",
+  plan_type: "patient",
   appointment_allowed: false,
   ai_diet_allowed: false,
   weight_tracker_allowed: false,
@@ -281,9 +281,9 @@ function PlanModal({ mode, plan, onClose, onSave }) {
             <div className="grid grid-cols-2 gap-3">
               <button
                 type="button"
-                onClick={() => set("plan_type", "user")}
+                onClick={() => set("plan_type", "patient")}
                 className={`px-4 py-3 rounded-lg border-2 font-medium text-sm transition cursor-pointer ${
-                  form.plan_type === "user"
+                  form.plan_type === "patient"
                     ? "border-orange-500 bg-orange-50 text-orange-700"
                     : "border-gray-200 bg-white text-gray-600 hover:border-gray-300"
                 }`}
