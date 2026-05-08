@@ -51,6 +51,8 @@ export default function SubscriptionPlans() {
   const [modal, setModal] = useState(null); // null | { mode: 'add'|'edit', plan?: {} }
   const [togglingId, setTogglingId] = useState(null);
 
+const [activeTab, setActiveTab] = useState("patient");  
+
   const fetchPlans = async () => {
     setLoading(true);
     setError("");
@@ -79,6 +81,11 @@ export default function SubscriptionPlans() {
       setTogglingId(null);
     }
   };
+  const filteredPlans = plans.filter((plan) =>
+  activeTab === "patient"
+    ? plan.plan_type === "patient"
+    : plan.plan_type === "nutritionist"
+);
 
   return (
     <div className="p-6 space-y-5">
@@ -105,6 +112,30 @@ export default function SubscriptionPlans() {
         </button>
       </div>
 
+      <div className="flex items-center gap-3">
+  <button
+    onClick={() => setActiveTab("patient")}
+    className={`px-5 py-2 rounded-xl text-sm font-semibold transition cursor-pointer ${
+      activeTab === "patient"
+        ? "bg-orange-500 text-white"
+        : "bg-white border border-gray-200 text-gray-600 hover:border-orange-300"
+    }`}
+  >
+    Patient Plans
+  </button>
+
+  <button
+    onClick={() => setActiveTab("nutritionist")}
+    className={`px-5 py-2 rounded-xl text-sm font-semibold transition cursor-pointer ${
+      activeTab === "nutritionist"
+        ? "bg-orange-500 text-white"
+        : "bg-white border border-gray-200 text-gray-600 hover:border-orange-300"
+    }`}
+  >
+    Nutritionist Plans
+  </button>
+</div>
+
       {/* Content */}
       {loading ? (
         <div className="flex items-center justify-center py-24">
@@ -114,7 +145,7 @@ export default function SubscriptionPlans() {
         <div className="text-center py-24 text-red-400 text-sm">{error}</div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
-          {plans.map((plan, i) => (
+         {filteredPlans.map((plan, i) => (
             <PlanCard
               key={plan.id}
               plan={plan}
