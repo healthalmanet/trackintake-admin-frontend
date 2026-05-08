@@ -121,7 +121,7 @@ export default function DietPlansMain() {
 
   const fetchUsers = async () => {
     try {
-      const data = await getUsers();
+      const data = await getUsers({}, 1, 1000); // Fetch up to 1000 users
       const usersArray = Array.isArray(data) ? data : (data?.results ? data.results : []);
       setUsers(usersArray);
     } catch (error) {
@@ -141,8 +141,17 @@ export default function DietPlansMain() {
     return map;
   }, {});
 
-  const getUserName = (userId) => userMap[userId] || `User ${userId}`;
-  const getNutritionistName = (nutritionistId) => nutritionistMap[nutritionistId] || 'Unassigned';
+  const getUserName = (userId) => {
+    const name = userMap[userId];
+    if (name) return name;
+    // If not found in userMap, try to find in plans data
+    return `User ${userId}`;
+  };
+  
+  const getNutritionistName = (nutritionistId) => {
+    if (!nutritionistId) return 'Unassigned';
+    return nutritionistMap[nutritionistId] || `Nutritionist ${nutritionistId}`;
+  };
 
   // Stats
   const totalPlans = totalCount;
@@ -269,7 +278,7 @@ export default function DietPlansMain() {
                       <div className="text-xs text-gray-500">to {new Date(new Date(plan.for_week_starting).getTime() + 6*24*60*60*1000).toISOString().split('T')[0]}</div>
                     </td>
                     <td className="px-5 py-4 text-gray-600 font-medium">
-                      {assignedNutritionistMap[plan.user_id] || getNutritionistName(plan.reviewed_by_id) || 'Unassigned'}
+                      {assignedNutritionistMap[plan.user_id] || (plan.reviewed_by_id ? getNutritionistName(plan.reviewed_by_id) : 'Unassigned')}
                     </td>
                     <td className="px-5 py-4">
                       <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold ${getStatusColor(plan.status)}`}>
