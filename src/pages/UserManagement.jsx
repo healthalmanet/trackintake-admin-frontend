@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { Search, Eye, Pencil, ChevronDown, Loader2, X, MapPin, Calendar, CheckCircle, XCircle } from "lucide-react";
+import { Search, Eye, Pencil, ChevronDown, Loader2, X, MapPin, Calendar, CheckCircle, XCircle, Key } from "lucide-react";
 import * as api from "../api/users";
 
 const STATUSES = ["All", "Active", "Inactive"];
@@ -35,6 +35,7 @@ export default function UserManagement({ pageState = {} }) {
   const [viewUser, setViewUser] = useState(null);
   const [healthProfile, setHealthProfile] = useState(null);
   const [profileLoading, setProfileLoading] = useState(false);
+  const [resetPasswordUser, setResetPasswordUser] = useState(null);
   
   // Local state for checking toggles
   const [togglingId, setTogglingId] = useState(null);
@@ -113,6 +114,13 @@ export default function UserManagement({ pageState = {} }) {
           profile={healthProfile}
           loading={profileLoading}
           onClose={() => { setViewUser(null); setHealthProfile(null); }}
+        />
+      )}
+      {resetPasswordUser && (
+        <ResetPasswordModal
+          user={resetPasswordUser}
+          onClose={() => setResetPasswordUser(null)}
+          onSuccess={() => { setResetPasswordUser(null); }}
         />
       )}
 
@@ -266,6 +274,9 @@ export default function UserManagement({ pageState = {} }) {
                         </button>
                         <button title="Edit User" onClick={() => setModal({ user })} className="p-2 rounded-lg text-gray-400 hover:bg-blue-50 hover:text-blue-500 transition cursor-pointer">
                           <Pencil size={16} />
+                        </button>
+                        <button title="Reset Password" onClick={() => setResetPasswordUser(user)} className="p-2 rounded-lg text-gray-400 hover:bg-purple-50 hover:text-purple-500 transition cursor-pointer">
+                          <Key size={16} />
                         </button>
                         
                         {/* TOGGLE STATUS BUTTON replacing DELETE */}
@@ -536,6 +547,119 @@ function ViewModal({ user, profile, loading, onClose }) {
             )}
           </div>
         </div>
+      </div>
+    </div>
+  );
+}
+
+function ResetPasswordModal({ user, onClose, onSuccess }) {
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError("");
+
+    // Validation
+    if (!newPassword || !confirmPassword) {
+      setError("Both password fields are required");
+      return;
+    }
+    if (newPassword.length < 6) {
+      setError("Password must be at least 6 characters");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setError("Passwords do not match");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      await api.resetPassword(user.id, newPassword, confirmPassword);
+      onSuccess();
+    } catch (err) {
+      setError(err.message || "Failed to reset password");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md">
+        <div className="flex items-center justify-between p-5 border-b border-gray-100">
+          <h2 className="text-lg font-bold text-gray-900">Reset Password</h2>
+          <button onClick={onClose} className="p-2 rounded-lg hover:bg-gray-100 transition cursor-pointer">
+            <X size={18} className="text-gray-500" />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="p-5 space-y-4">
+          <div className="bg-purple-50 rounded-lg px-4 py-3 border border-purple-100">
+            <p className="text-xs font-bold text-purple-600 uppercase tracking-wide">User</p>
+            <p className="text-sm font-semibold text-gray-800 mt-1">{user.full_name}</p>
+            <p className="text-xs text-gray-500 mt-0.5">{user.email}</p>
+          </div>
+
+          {error && (
+            <div className="bg-red-50 rounded-lg px-4 py-3 border border-red-100">
+              <p className="text-sm font-semibold text-red-600">{error}</p>
+            </div>
+          )}
+
+          <div>
+            <label className="block text-xs font-bold text-gray-600 mb-1">New Password</label>
+            <div className="relative">
+              <input
+                type={showPassword ? "text" : "password"}
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                placeholder="Enter new password (min 6 chars)"
+                className="w-full px-3 py-2.5 text-sm bg-gray-50/50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-300 focus:bg-white transition pr-10"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition"
+              >
+                {showPassword ? "Hide" : "Show"}
+              </button>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-gray-600 mb-1">Confirm Password</label>
+            <input
+              type={showPassword ? "text" : "password"}
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              placeholder="Confirm new password"
+              className="w-full px-3 py-2.5 text-sm bg-gray-50/50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-300 focus:bg-white transition"
+            />
+          </div>
+
+          <div className="flex gap-3 pt-4">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 px-4 py-2 text-sm font-semibold border border-gray-200 rounded-xl hover:bg-gray-50 transition cursor-pointer"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={loading}
+              className="flex-1 px-4 py-2 text-sm font-semibold bg-purple-500 text-white rounded-xl hover:bg-purple-600 transition cursor-pointer disabled:opacity-60 shadow-sm shadow-purple-500/20 flex items-center justify-center gap-2"
+            >
+              {loading ? <Loader2 size={16} className="animate-spin" /> : <Key size={16} />}
+              {loading ? "Resetting..." : "Reset Password"}
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   );
