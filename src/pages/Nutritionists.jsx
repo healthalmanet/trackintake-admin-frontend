@@ -1,9 +1,9 @@
 import { useState, useMemo, useEffect } from "react";
 import {
   Search, ChevronDown, X, CheckCircle, Users,
-  Filter, SlidersHorizontal, Loader2
+  Filter, SlidersHorizontal, Loader2, Check
 } from "lucide-react";
-import { getNutritionists, assignNutritionist, getEligibleUsersForNutritionist } from "../api/users";
+import { getNutritionists, assignNutritionist, getEligibleUsersForNutritionist, approveNutritionist } from "../api/users";
 
 const INITIALS_COLORS = [
   "bg-orange-100 text-orange-600", "bg-blue-100 text-blue-600",
@@ -20,7 +20,7 @@ function Toast({ message, onClose }) {
   );
 }
 
-function NutritionistCard({ profile, onViewDetails, onAssign }) {
+function NutritionistCard({ profile, onViewDetails, onAssign, onApprove }) {
   const initials = profile.user_name
     ? profile.user_name.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase()
     : `N${profile.id}`;
@@ -64,6 +64,12 @@ function NutritionistCard({ profile, onViewDetails, onAssign }) {
           className="flex-1 py-2 text-xs font-semibold text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition cursor-pointer">
           Details
         </button>
+        {!profile.is_verified && (
+          <button onClick={() => onApprove(profile)}
+            className="flex-1 py-2 text-xs font-semibold text-white bg-green-500 hover:bg-green-600 rounded-lg transition cursor-pointer flex items-center justify-center gap-1">
+            <Check size={14} /> Verify
+          </button>
+        )}
         <button onClick={() => onAssign(profile)}
           className="flex-1 py-2 text-xs font-semibold text-white bg-orange-500 hover:bg-orange-600 rounded-lg transition cursor-pointer">
           Assign
@@ -234,6 +240,78 @@ function AssignModal({ profile, patients, onClose, onConfirm }) {
   );
 }
 
+function ApprovalModal({ profile, onClose, onConfirm }) {
+  const [loading, setLoading] = useState(false);
+  const initials = profile.user_name
+    ? profile.user_name.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase()
+    : `N${profile.id}`;
+  const colorClass = INITIALS_COLORS[profile.id % INITIALS_COLORS.length];
+
+  const handleVerify = async () => {
+    setLoading(true);
+    try {
+      await onConfirm(profile);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6">
+        <div className="flex items-start justify-between mb-4">
+          <div>
+            <p className="text-xl font-bold text-gray-900">Verify Nutritionist</p>
+            <p className="text-sm text-gray-400 mt-1">Confirm verification for this professional.</p>
+          </div>
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100 cursor-pointer"><X size={16} /></button>
+        </div>
+
+        <div className="flex items-center gap-3 bg-green-50 rounded-xl px-4 py-4 mb-4 border border-green-100">
+          <div className={`w-12 h-12 rounded-full flex items-center justify-center text-sm font-bold ${colorClass}`}>{initials}</div>
+          <div>
+            <p className="text-sm font-bold text-gray-900">{profile.user_name || `Nutritionist #${profile.user_id}`}</p>
+            <p className="text-xs text-gray-500">{profile.email}</p>
+          </div>
+        </div>
+
+        <div className="bg-gray-50 rounded-xl p-4 space-y-2 mb-4">
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-gray-500 font-medium">Type</span>
+            <span className="text-xs font-bold text-gray-800">{profile.nutritionist_type}</span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-gray-500 font-medium">Verified</span>
+            <span className={`text-xs font-bold ${profile.is_verified ? "text-green-600" : "text-yellow-500"}`}>
+              {profile.is_verified ? "✓ Yes" : "⏳ Pending"}
+            </span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-gray-500 font-medium">Virtual Enabled</span>
+            <span className={`text-xs font-bold ${profile.is_virtual_enabled ? "text-purple-600" : "text-gray-400"}`}>
+              {profile.is_virtual_enabled ? "Yes" : "No"}
+            </span>
+          </div>
+        </div>
+
+        <p className="text-xs text-gray-500 mb-4">Once verified, this nutritionist will be able to accept patient assignments and provide services.</p>
+
+        <div className="flex flex-col gap-2">
+          <button disabled={loading} onClick={handleVerify}
+            className="w-full py-3 bg-green-500 hover:bg-green-600 text-white text-sm font-bold rounded-xl transition cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2">
+            {loading ? <Loader2 size={16} className="animate-spin" /> : <Check size={16} />}
+            {loading ? "Verifying..." : "Verify Nutritionist"}
+          </button>
+          <button onClick={onClose}
+            className="w-full py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-semibold rounded-xl transition cursor-pointer">
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function Nutritionists() {
   const [nutritionists, setNutritionists] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -241,6 +319,7 @@ export default function Nutritionists() {
   const [typeFilter, setTypeFilter] = useState("All Types");
   const [detailsModal, setDetailsModal] = useState(null);
   const [assignModal, setAssignModal] = useState(null);
+  const [approvalModal, setApprovalModal] = useState(null);
   const [toast, setToast] = useState(null);
 
   const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(null), 3000); };
@@ -267,6 +346,21 @@ export default function Nutritionists() {
     }
   };
 
+  const handleApproveNutritionist = async (profile) => {
+    try {
+      await approveNutritionist(profile.user_id);
+      setApprovalModal(null);
+      showToast(`${profile.user_name || "Nutritionist"} verified successfully`);
+      
+      // Refresh nutritionists list
+      getNutritionists()
+        .then((data) => setNutritionists(data.data || []))
+        .catch(() => console.error("Failed to refresh nutritionists"));
+    } catch (err) {
+      showToast("Verification failed: " + err.message);
+    }
+  };
+
   const types = ["All Types", ...new Set(nutritionists.map((n) => n.nutritionist_type).filter(Boolean))];
 
   const filtered = useMemo(() => nutritionists.filter((n) => {
@@ -286,6 +380,7 @@ export default function Nutritionists() {
       {toast && <Toast message={toast} onClose={() => setToast(null)} />}
       {detailsModal && <DetailsModal profile={detailsModal} onClose={() => setDetailsModal(null)} onAssign={setAssignModal} />}
       {assignModal && <AssignModal profile={assignModal} onClose={() => setAssignModal(null)} onConfirm={handleConfirmAssign} />}
+      {approvalModal && <ApprovalModal profile={approvalModal} onClose={() => setApprovalModal(null)} onConfirm={handleApproveNutritionist} />}
 
       <div className="flex items-start justify-between flex-wrap gap-4">
         <div>
@@ -336,7 +431,7 @@ export default function Nutritionists() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {filtered.map((n) => (
-            <NutritionistCard key={n.id} profile={n} onViewDetails={setDetailsModal} onAssign={setAssignModal} />
+            <NutritionistCard key={n.id} profile={n} onViewDetails={setDetailsModal} onAssign={setAssignModal} onApprove={setApprovalModal} />
           ))}
         </div>
       )}
