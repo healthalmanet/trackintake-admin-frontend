@@ -45,7 +45,7 @@ export const getDashboardStats = async ({ range, date } = {}) => {
       planDistRes,
       revenueByPlanRes,
       recentRes,
-    ] = await Promise.all([
+    ] = await Promise.allSettled([
       fetchJSON(`${BASE}/total-users${params}`),
       fetchJSON(`${BASE}/active-users${params}`),
       fetchJSON(`${BASE}/total-revenue${params}`),
@@ -56,15 +56,22 @@ export const getDashboardStats = async ({ range, date } = {}) => {
       fetchJSON(`${BASE}/recent-activity${params}`),
     ]);
 
+    // Handle settled promises
+    const getValue = (settled) => {
+      if (settled.status === 'fulfilled') return settled.value;
+      console.error('API call failed:', settled.reason);
+      return {};
+    };
+
     const result = {
-      totalUsers: totalUsersRes.totalUsers,
-      activeUsers: activeUsersRes.activeUsers,
-      totalRevenue: totalRevenueRes.totalRevenue,
-      pendingAppts: pendingRes.pendingAppointments,
-      userGrowth: growthRes.userGrowth ?? [],
-      planDistribution: planDistRes.planDistribution ?? [],
-      revenueByPlan: revenueByPlanRes.revenueByPlan ?? [],
-      recentActivity: recentRes.recentSignups ?? [],
+      totalUsers: getValue(totalUsersRes).totalUsers ?? 0,
+      activeUsers: getValue(activeUsersRes).activeUsers ?? 0,
+      totalRevenue: getValue(totalRevenueRes).totalRevenue ?? 0,
+      pendingAppts: getValue(pendingRes).pendingAppointments ?? 0,
+      userGrowth: getValue(growthRes).userGrowth ?? [],
+      planDistribution: getValue(planDistRes).planDistribution ?? [],
+      revenueByPlan: getValue(revenueByPlanRes).revenueByPlan ?? [],
+      recentActivity: getValue(recentRes).recentSignups ?? [],
       mealCats: [],
     };
     

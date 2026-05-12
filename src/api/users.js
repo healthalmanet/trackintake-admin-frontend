@@ -95,3 +95,28 @@ export const getEligibleUsersForNutritionist = async (nutritionistType = '') => 
   if (!res.ok) throw new Error("Failed to fetch eligible users");
   return res.json();
 };
+
+export const approveNutritionist = async (nutritionistId) => {
+  const res = await fetch(`${API_BASE_URL}/api/nutritionist/approve/${nutritionistId}/`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+  });
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.message || "Failed to approve nutritionist");
+  return json;
+};
+
+export const resetPassword = async (userId, newPassword, confirmPassword) => {
+  const res = await fetch(`${BASE}/reset-password/`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      user_id: userId,
+      new_password: newPassword,
+      confirm_password: confirmPassword,
+    }),
+  });
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.error || json.message || "Failed to reset password");
+  return json;
+};
