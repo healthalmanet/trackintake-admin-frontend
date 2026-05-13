@@ -142,9 +142,18 @@ export default function DietPlansMain() {
   }, {});
 
   const getUserName = (userId) => {
+    // First check if the plan object has user_name from API
+    // This is the primary source of truth from backend
+    const plan = plans.find(p => p.user_id === userId);
+    if (plan && plan.user_name) {
+      return plan.user_name;
+    }
+    
+    // Fallback to userMap if available
     const name = userMap[userId];
     if (name) return name;
-    // If not found in userMap, try to find in plans data
+    
+    // Final fallback
     return `User ${userId}`;
   };
   
