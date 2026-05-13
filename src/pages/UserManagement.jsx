@@ -144,11 +144,11 @@ export default function UserManagement({ pageState = {} }) {
       </div>
 
       {/* Filters */}
-      <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5 flex flex-col gap-4">
+      <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 md:p-5 flex flex-col gap-4">
         <h3 className="text-sm font-semibold text-gray-800">Filter Users</h3>
-        <div className="flex flex-wrap gap-3 items-center">
+        <div className="flex flex-col sm:flex-row sm:flex-wrap gap-3 items-start sm:items-center">
           
-          <div className="relative flex-1 min-w-[200px]">
+          <div className="relative w-full sm:flex-1 sm:min-w-[200px]">
             <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
             <input
               type="text"
@@ -159,7 +159,7 @@ export default function UserManagement({ pageState = {} }) {
             />
           </div>
 
-          <div className="relative flex-1 min-w-[150px]">
+          <div className="relative w-full sm:flex-1 sm:min-w-[140px]">
             <MapPin size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
             <input
               type="text"
@@ -170,7 +170,7 @@ export default function UserManagement({ pageState = {} }) {
             />
           </div>
 
-          <div className="relative flex-1 min-w-[150px]">
+          <div className="relative w-full sm:flex-1 sm:min-w-[140px]">
             <MapPin size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
             <input
               type="text"
@@ -181,7 +181,7 @@ export default function UserManagement({ pageState = {} }) {
             />
           </div>
 
-          <div className="flex bg-white border border-gray-200 rounded-lg focus-within:ring-2 focus-within:ring-orange-300 focus-within:border-orange-400 transition min-w-[220px] shadow-sm">
+          <div className="flex w-full sm:w-auto bg-white border border-gray-200 rounded-lg focus-within:ring-2 focus-within:ring-orange-300 focus-within:border-orange-400 transition shadow-sm">
             <select
               value={dateFilterMode}
               onChange={(e) => { setDateFilterMode(e.target.value); setDateFilter(""); }}
@@ -209,7 +209,7 @@ export default function UserManagement({ pageState = {} }) {
             { label: "Role", options: planOptions, value: planFilter, set: (v) => { setPlanFilter(v); setPage(1); } },
             { label: "Status", options: STATUSES, value: statusFilter, set: (v) => { setStatusFilter(v); setPage(1); } },
           ].map(({ label, options, value, set }) => (
-            <div key={label} className="relative min-w-[120px]">
+            <div key={label} className="relative w-full sm:w-auto sm:min-w-[120px]">
               <select value={value} onChange={(e) => set(e.target.value)}
                 className="w-full appearance-none pl-3 pr-8 py-2 text-sm bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-300 focus:border-orange-400 transition cursor-pointer text-gray-700">
                 {options.map((o) => <option key={o} value={o}>{o === "All" ? `${label}: All` : o}</option>)}
