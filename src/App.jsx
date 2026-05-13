@@ -96,9 +96,9 @@ export default function App() {
       {!isAuthenticated ? (
         <AdminLogin onLoginSuccess={handleLoginSuccess} />
       ) : (
-        <div className="flex h-screen bg-gray-50 overflow-hidden">
+        <div className="flex h-screen bg-gray-50 overflow-hidden flex-col md:flex-row">
           <Sidebar active={activePage} onNavigate={handleNavigate} />
-          <div className="flex-1 flex flex-col overflow-hidden">
+          <div className="flex-1 flex flex-col overflow-hidden w-full">
             <Navbar unreadCount={unreadCount} onNotificationClick={() => handleNavigate("notifications")} onLogout={handleLogout} />
             <main className="flex-1 overflow-y-auto">
               {renderPage()}
