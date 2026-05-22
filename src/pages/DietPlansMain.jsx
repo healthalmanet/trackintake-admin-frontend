@@ -1,10 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
 import { Search, Eye, X, Apple } from 'lucide-react';
-import { getDietPlans, getNutritionists, getUsers, getAssignedNutritionist } from '../api/dietPlans';
+import { getDietPlans, getNutritionists, getUsers, getAssignedNutritionist, getDietStats } from '../api/dietPlans';
 
 export default function DietPlansMain() {
   const [plans, setPlans] = useState([]);
-  const [allPlans, setAllPlans] = useState([]);
   const [loading, setLoading] = useState(true);
   const [nutritionists, setNutritionists] = useState([]);
   const [users, setUsers] = useState([]);
@@ -24,6 +23,9 @@ export default function DietPlansMain() {
   const [viewDrawer, setViewDrawer] = useState(null);
   const [assignedNutritionist, setAssignedNutritionist] = useState(null);
   const [assignedNutritionistMap, setAssignedNutritionistMap] = useState({});
+  
+  // Stats
+  const [stats, setStats] = useState({ total: 0, approved: 0, pending: 0, failed: 0, rejected: 0 });
   
   // Debounce ref
   const searchTimeoutRef = useRef(null);
@@ -58,7 +60,7 @@ export default function DietPlansMain() {
         fetchNutritionists(),
         fetchUsers(),
         fetchPlans(),
-        fetchAllPlansForStats()
+        fetchStats()
       ]);
     } finally {
       setLoading(false);
@@ -99,13 +101,13 @@ export default function DietPlansMain() {
     }
   };
 
-  const fetchAllPlansForStats = async () => {
+  const fetchStats = async () => {
     try {
-      const data = await getDietPlans({}, 1, 1000);
-      setAllPlans(data.results || []);
+      const statsData = await getDietStats();
+      setStats(statsData);
     } catch (error) {
       console.error('Error fetching stats:', error);
-      setAllPlans([]);
+      setStats({ total: 0, approved: 0, pending: 0, failed: 0, rejected: 0 });
     }
   };
 
@@ -121,7 +123,7 @@ export default function DietPlansMain() {
 
   const fetchUsers = async () => {
     try {
-      const data = await getUsers({}, 1, 1000); // Fetch up to 1000 users
+      const data = await getUsers();
       const usersArray = Array.isArray(data) ? data : (data?.results ? data.results : []);
       setUsers(usersArray);
     } catch (error) {
@@ -162,12 +164,12 @@ export default function DietPlansMain() {
     return nutritionistMap[nutritionistId] || `Nutritionist ${nutritionistId}`;
   };
 
-  // Stats
-  const totalPlans = totalCount;
-  const approvedPlans = allPlans.filter(p => p.status?.toLowerCase() === 'approved').length;
-  const pendingPlans = allPlans.filter(p => p.status?.toLowerCase() === 'pending').length;
-  const failedPlans = allPlans.filter(p => p.status?.toLowerCase() === 'failed').length;
-  const rejectedPlans = allPlans.filter(p => p.status?.toLowerCase() === 'rejected').length;
+  // Stats from API
+  const totalPlans = stats.total;
+  const approvedPlans = stats.approved;
+  const pendingPlans = stats.pending;
+  const failedPlans = stats.failed;
+  const rejectedPlans = stats.rejected;
 
   const getStatusColor = (status) => {
     const colors = {

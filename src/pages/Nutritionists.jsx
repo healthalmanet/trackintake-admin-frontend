@@ -42,6 +42,14 @@ function NutritionistCard({ profile, onViewDetails, onAssign, onApprove }) {
           <span className="text-xs text-gray-700 truncate max-w-[160px]">{profile.email || "—"}</span>
         </div>
         <div className="flex items-center justify-between">
+          <span className="text-gray-400 text-xs font-medium">Experience</span>
+          <span className="text-xs text-gray-700">{profile.experience_years ? `${profile.experience_years} years` : "—"}</span>
+        </div>
+        <div className="flex items-center justify-between">
+          <span className="text-gray-400 text-xs font-medium">Degree</span>
+          <span className="text-xs text-gray-700 truncate max-w-[160px]">{profile.degree || "—"}</span>
+        </div>
+        <div className="flex items-center justify-between">
           <span className="text-gray-400 text-xs font-medium">Verified</span>
           <span className={`text-xs font-bold ${profile.is_verified ? "text-green-600" : "text-gray-400"}`}>
             {profile.is_verified ? "✓ Yes" : "✗ No"}
@@ -117,6 +125,30 @@ function DetailsModal({ profile, onClose, onAssign }) {
                   <span className="text-xs font-semibold text-gray-800">{v}</span>
                 </div>
               ))}
+            </div>
+          </div>
+
+          <div>
+            <p className="text-xs font-bold text-blue-500 uppercase tracking-widest mb-3">Credentials</p>
+            <div className="bg-blue-50 rounded-xl p-4 space-y-3 border border-blue-100">
+              {[
+                ["Experience", profile.experience_years ? `${profile.experience_years} years` : "—"],
+                ["Degree", profile.degree || "—"],
+                ["License Number", profile.license_number || "—"],
+              ].map(([l, v]) => (
+                <div key={l} className="flex items-center justify-between">
+                  <span className="text-xs text-gray-400 font-medium">{l}</span>
+                  <span className="text-xs font-semibold text-gray-800">{v}</span>
+                </div>
+              ))}
+              {profile.certificate && (
+                <div className="flex items-center justify-between pt-2 border-t border-blue-200">
+                  <span className="text-xs text-gray-400 font-medium">Certificate</span>
+                  <a href={profile.certificate} target="_blank" rel="noopener noreferrer" className="text-xs font-semibold text-blue-600 hover:text-blue-700 underline">
+                    View
+                  </a>
+                </div>
+              )}
             </div>
           </div>
 
@@ -326,7 +358,7 @@ export default function Nutritionists() {
 
   useEffect(() => {
     getNutritionists()
-      .then((data) => setNutritionists(data.data || []))
+      .then((data) => setNutritionists(Array.isArray(data) ? data : (data.data || [])))
       .catch(() => setNutritionists([]))
       .finally(() => setLoading(false));
   }, []);
@@ -339,7 +371,7 @@ export default function Nutritionists() {
       
       // Refresh nutritionists list to show updated patient count
       getNutritionists()
-        .then((data) => setNutritionists(data.data || []))
+        .then((data) => setNutritionists(Array.isArray(data) ? data : (data.data || [])))
         .catch(() => console.error("Failed to refresh nutritionists"));
     } catch (err) {
       showToast("Assignment failed: " + err.message);
@@ -354,7 +386,7 @@ export default function Nutritionists() {
       
       // Refresh nutritionists list
       getNutritionists()
-        .then((data) => setNutritionists(data.data || []))
+        .then((data) => setNutritionists(Array.isArray(data) ? data : (data.data || [])))
         .catch(() => console.error("Failed to refresh nutritionists"));
     } catch (err) {
       showToast("Verification failed: " + err.message);

@@ -601,8 +601,11 @@ function ResetPasswordModal({ user, onClose, onSuccess }) {
         <form onSubmit={handleSubmit} className="p-5 space-y-4">
           <div className="bg-purple-50 rounded-lg px-4 py-3 border border-purple-100">
             <p className="text-xs font-bold text-purple-600 uppercase tracking-wide">User</p>
-            <p className="text-sm font-semibold text-gray-800 mt-1">{user.full_name}</p>
+            <p className="text-sm font-semibold text-gray-800 mt-1">
+              {user.full_name} <span className="text-purple-600 font-bold">(ID: #{user.id})</span>
+            </p>
             <p className="text-xs text-gray-500 mt-0.5">{user.email}</p>
+            <p className="text-xs text-gray-500 mt-1">Role: <span className="font-semibold text-gray-700">{user.role || 'user'}</span></p>
           </div>
 
           {error && (
@@ -610,6 +613,17 @@ function ResetPasswordModal({ user, onClose, onSuccess }) {
               <p className="text-sm font-semibold text-red-600">{error}</p>
             </div>
           )}
+
+          <div className="bg-blue-50 rounded-lg px-4 py-3 border border-blue-100">
+            <p className="text-xs font-bold text-blue-600 uppercase tracking-wide mb-2">Password Requirements</p>
+            <ul className="text-xs text-blue-700 space-y-1">
+              <li>✓ Minimum 8 characters</li>
+              <li>✓ 1 uppercase letter (A-Z)</li>
+              <li>✓ 1 lowercase letter (a-z)</li>
+              <li>✓ 1 number (0-9)</li>
+              <li>✓ 1 special character (!@#$%^&*)</li>
+            </ul>
+          </div>
 
           <div>
             <label className="block text-xs font-bold text-gray-600 mb-1">New Password</label>

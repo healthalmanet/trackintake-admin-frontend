@@ -194,3 +194,16 @@ export const getAssignedNutritionist = async (userId) => {
     return null;
   }
 };
+
+// Get diet stats
+export const getDietStats = async () => {
+  try {
+    const res = await fetch(`${BASE}/diet-recommendations/stats/`);
+    if (!res.ok) throw new Error(`Failed to fetch diet stats (${res.status})`);
+    const data = await res.json();
+    return data.data || data;
+  } catch (error) {
+    console.error('Get diet stats error:', error);
+    return { total: 0, approved: 0, pending: 0, failed: 0, rejected: 0 };
+  }
+};
