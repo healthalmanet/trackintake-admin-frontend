@@ -19,6 +19,19 @@ const fetchJSON = async (url) => {
   }
 };
 
+export const getDashboardOverview = async ({ range = "all", date, month, year, startDate, endDate } = {}) => {
+  const query = new URLSearchParams();
+  if (range && range !== "all") query.set("range", range);
+  if (date) query.set("date", date);
+  if (month) query.set("month", month);
+  if (year) query.set("year", year);
+  if (startDate) query.set("start_date", startDate);
+  if (endDate) query.set("end_date", endDate);
+
+  const qs = query.toString() ? `?${query.toString()}` : "";
+  return await fetchJSON(`${BASE}/overview/${qs}`);
+};
+
 export const getDashboardStats = async ({ range, date } = {}) => {
   //  query params based on range type
   let params = "";

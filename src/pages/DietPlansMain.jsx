@@ -214,21 +214,22 @@ export default function DietPlansMain() {
       </div>
 
       {/* Filter Bar */}
-      <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5 flex flex-col gap-4">
+      <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 md:p-5 flex flex-col gap-4">
         <div className="flex items-center justify-between">
           <h3 className="text-sm font-semibold text-gray-800">Filter Plans</h3>
           <button
             onClick={() => {
               setSearchTerm('');
               setStatusFilter('All');
+              setNutritionistFilter('');
               setCurrentPage(1);
             }}
-            className="text-[#F97316] text-sm font-semibold hover:underline"
+            className="text-[#F97316] text-xs md:text-sm font-semibold hover:underline cursor-pointer"
           >
             Reset Filters
           </button>
         </div>
-        <div className="flex flex-wrap gap-3 items-center">
+        <div className="flex flex-col sm:flex-row flex-wrap gap-3 items-stretch sm:items-center">
           <div className="relative flex-1 min-w-[200px]">
             <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
             <input
@@ -240,20 +241,40 @@ export default function DietPlansMain() {
             />
           </div>
 
-          <select
-            value={statusFilter}
-            onChange={(e) => {
-              setStatusFilter(e.target.value);
-              setCurrentPage(1);
-            }}
-            className="px-4 py-2 text-sm bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-300 focus:border-orange-400 transition cursor-pointer"
-          >
-            <option value="All">All Status</option>
-            <option value="Approved">Approved</option>
-            <option value="Pending">Pending</option>
-            <option value="Failed">Failed</option>
-            <option value="Rejected">Rejected</option>
-          </select>
+          <div className="w-full sm:w-auto">
+            <select
+              value={nutritionistFilter}
+              onChange={(e) => {
+                setNutritionistFilter(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="w-full sm:w-auto px-4 py-2 text-sm bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-300 focus:border-orange-400 transition cursor-pointer font-medium text-gray-700"
+            >
+              <option value="">All Nutritionists</option>
+              {nutritionists.map((nut) => (
+                <option key={nut.id} value={nut.id}>
+                  {nut.full_name || `Nutritionist ${nut.id}`}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="w-full sm:w-auto">
+            <select
+              value={statusFilter}
+              onChange={(e) => {
+                setStatusFilter(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="w-full sm:w-auto px-4 py-2 text-sm bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-300 focus:border-orange-400 transition cursor-pointer font-medium text-gray-700"
+            >
+              <option value="All">All Status</option>
+              <option value="Approved">Approved</option>
+              <option value="Pending">Pending</option>
+              <option value="Failed">Failed</option>
+              <option value="Rejected">Rejected</option>
+            </select>
+          </div>
         </div>
       </div>
 
@@ -353,7 +374,7 @@ export default function DietPlansMain() {
             <div className="p-6 space-y-6">
               <div>
                 <h3 className="text-lg font-bold text-gray-900 mb-4 border-b-2 border-orange-200 pb-2">Patient Information</h3>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
                     <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Patient Name</p>
                     <p className="text-lg font-bold text-gray-900 mt-2">{getUserName(viewDrawer.user_id)}</p>

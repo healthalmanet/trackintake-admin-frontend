@@ -1,18 +1,34 @@
-import { useState, useEffect } from "react";
-import { Plus, Pencil, Check, X, Loader2, Crown, Power, PowerOff } from "lucide-react";
+import { useState, useEffect, useMemo } from "react";
+import {
+  Plus, Pencil, Check, X, Loader2, Crown, Power, PowerOff,
+  Search, ChevronDown, Sparkles, User, Stethoscope, CheckCircle2,
+  IndianRupee, Layers, ShieldCheck, RefreshCw
+} from "lucide-react";
 import * as api from "../api/plans";
 
-const FEATURE_FIELDS = [
+const PATIENT_FEATURE_FIELDS = [
   { key: "appointment_allowed", label: "Appointments" },
-  { key: "ai_diet_allowed", label: "AI Diet" },
+  { key: "ai_diet_allowed", label: "AI Diet Formulation" },
   { key: "weight_tracker_allowed", label: "Weight Tracker" },
   { key: "nutrition_search_allowed", label: "Nutrition Search" },
   { key: "custom_reminder_allowed", label: "Custom Reminders" },
-  { key: "chat_allowed", label: "Chat" },
-  { key: "Fat_Calculator_allowed", label: "Fat Calculator" },
+  { key: "chat_allowed", label: "Chat Support" },
+  { key: "Fat_Calculator_allowed", label: "Body Fat Calculator" },
   { key: "BMI_Calculator_allowed", label: "BMI Calculator" },
   { key: "meal_log_allowed", label: "Meal Log" },
   { key: "water_intake_allowed", label: "Water Intake Tracker" },
+];
+
+const NUTRITIONIST_FEATURE_FIELDS = [
+  { key: "nutri_ai_diet_allowed", label: "AI Diet Engine" },
+  { key: "nutri_manual_diet_allowed", label: "Manual Diet Planner" },
+  { key: "nutri_bulk_upload_allowed", label: "Bulk Patient Upload" },
+  { key: "nutri_lab_reports_allowed", label: "Lab Reports Analysis" },
+  { key: "nutri_smart_assistant_allowed", label: "Nutro AI Assistant" },
+  { key: "nutri_online_appointment_allowed", label: "Online Consultations" },
+  { key: "nutri_offline_appointment_allowed", label: "Clinic Consultations" },
+  { key: "nutri_chat_allowed", label: "Direct Patient Chat" },
+  { key: "nutri_export_reports_allowed", label: "Export Clinical Reports" },
 ];
 
 const EMPTY_FORM = {
@@ -23,6 +39,7 @@ const EMPTY_FORM = {
   expert_consults: 0,
   is_active: true,
   plan_type: "patient",
+  // Patient features
   appointment_allowed: false,
   ai_diet_allowed: false,
   weight_tracker_allowed: false,
@@ -35,30 +52,36 @@ const EMPTY_FORM = {
   water_intake_allowed: false,
   expert_consultation_fee: 0,
   inhouse_consultation_fee: 0,
+  // Nutritionist features
+  nutri_ai_diet_allowed: false,
+  nutri_manual_diet_allowed: false,
+  nutri_bulk_upload_allowed: false,
+  nutri_lab_reports_allowed: false,
+  nutri_smart_assistant_allowed: false,
+  nutri_online_appointment_allowed: false,
+  nutri_offline_appointment_allowed: false,
+  nutri_chat_allowed: false,
+  nutri_export_reports_allowed: false,
+  nutri_max_patients: 0,
 };
-
-const planAccentColors = [
-  "border-gray-300 bg-gray-50",
-  "border-blue-400 bg-blue-50",
-  "border-orange-400 bg-orange-50",
-  "border-purple-400 bg-purple-50",
-];
 
 export default function SubscriptionPlans() {
   const [plans, setPlans] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [modal, setModal] = useState(null); // null | { mode: 'add'|'edit', plan?: {} }
+  const [modal, setModal] = useState(null);
   const [togglingId, setTogglingId] = useState(null);
 
-const [activeTab, setActiveTab] = useState("patient");  
+  // Filters
+  const [activeTab, setActiveTab] = useState("patient");
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
 
   const fetchPlans = async () => {
     setLoading(true);
     setError("");
     try {
       const data = await api.getPlans();
-      // Sort plans by ID in descending order (newest first)
       const sorted = [...data].sort((a, b) => b.id - a.id);
       setPlans(sorted);
     } catch (e) {
@@ -74,82 +97,260 @@ const [activeTab, setActiveTab] = useState("patient");
     setTogglingId(plan.id);
     try {
       await api.updatePlan(plan.id, { is_active: !plan.is_active });
-      setPlans(plans.map(p => p.id === plan.id ? { ...p, is_active: !p.is_active } : p));
+      setPlans(plans.map(p => p.id === plan.id ? { ...p, is_active: !plan.is_active } : p));
     } catch (e) {
       alert(e.message);
     } finally {
       setTogglingId(null);
     }
   };
-  const filteredPlans = plans.filter((plan) =>
-  activeTab === "patient"
-    ? plan.plan_type === "patient"
-    : plan.plan_type === "nutritionist"
-);
+
+  const filteredPlans = useMemo(() => {
+    return plans.filter((plan) => {
+      const matchesTab = activeTab === "patient"
+        ? (plan.plan_type === "patient" || plan.plan_type === "user" || !plan.plan_type)
+        : (plan.plan_type === "nutritionist");
+
+      const matchesSearch = !search || plan.name.toLowerCase().includes(search.toLowerCase());
+      const matchesStatus = statusFilter === "all"
+        ? true
+        : statusFilter === "active" ? plan.is_active : !plan.is_active;
+
+      return matchesTab && matchesSearch && matchesStatus;
+    });
+  }, [plans, activeTab, search, statusFilter]);
+
+  const patientPlansCount = plans.filter(p => p.plan_type === "patient" || p.plan_type === "user" || !p.plan_type).length;
+  const nutritionistPlansCount = plans.filter(p => p.plan_type === "nutritionist").length;
+  const activePlansCount = plans.filter(p => p.is_active).length;
+  const minPrice = plans.length > 0 ? Math.min(...plans.map(p => Number(p.price) || 0)) : 0;
 
   return (
-    <div className="p-6 space-y-5">
+    <div className="p-4 md:p-6 lg:p-8 space-y-6 bg-slate-50/60 min-h-screen">
       {modal && (
         <PlanModal
           mode={modal.mode}
           plan={modal.plan}
+          initialPlanType={activeTab}
           onClose={() => setModal(null)}
           onSave={() => { setModal(null); fetchPlans(); }}
         />
       )}
 
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Subscription Plans</h1>
-          <p className="text-sm text-gray-500 mt-0.5">Manage all subscription plans and features</p>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="space-y-1">
+          <div className="flex items-center gap-2.5">
+            <span className="text-[10px] font-black uppercase tracking-widest px-2.5 py-0.5 rounded-md bg-orange-100/80 text-orange-700 border border-orange-200/60">
+              Membership Tiers & Privileges
+            </span>
+            <span className="text-xs font-semibold text-slate-500">
+              {plans.length} Total Plans Configured
+            </span>
+          </div>
+          <h1 className="text-2xl md:text-3xl font-black text-slate-900 tracking-tight">
+            Subscription Plans & Entitlements
+          </h1>
+          <p className="text-xs md:text-sm text-slate-500 font-medium">
+            Configure client tiers, practitioner memberships, session quotas & tool permissions
+          </p>
         </div>
-        <button
-          onClick={() => setModal({ mode: "add" })}
-          className="flex items-center gap-2 px-4 py-2 bg-orange-500 text-white text-sm font-medium rounded-lg hover:bg-orange-600 transition cursor-pointer"
-        >
-          <Plus size={16} /> Add Plan
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => fetchPlans()}
+            disabled={loading}
+            className="p-2.5 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 text-slate-600 transition cursor-pointer shadow-xs"
+            title="Refresh Plans"
+          >
+            <RefreshCw size={15} className={loading ? "animate-spin text-orange-500" : ""} />
+          </button>
+          <button
+            onClick={() => setModal({ mode: "add" })}
+            className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-orange-500 hover:bg-orange-600 text-white text-xs md:text-sm font-bold rounded-xl shadow-sm shadow-orange-500/20 transition cursor-pointer shrink-0"
+          >
+            <Plus size={16} /> Create Plan
+          </button>
+        </div>
       </div>
 
-      <div className="flex items-center gap-3">
-  <button
-    onClick={() => setActiveTab("patient")}
-    className={`px-5 py-2 rounded-xl text-sm font-semibold transition cursor-pointer ${
-      activeTab === "patient"
-        ? "bg-orange-500 text-white"
-        : "bg-white border border-gray-200 text-gray-600 hover:border-orange-300"
-    }`}
-  >
-    Patient Plans
-  </button>
+      {/* Executive Summary Cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
+        {[
+          {
+            label: "Active Tiers",
+            value: activePlansCount,
+            sub: "Currently live on mobile",
+            icon: ShieldCheck,
+            color: "text-emerald-600",
+            border: "border-emerald-200",
+            bg: "bg-emerald-50 text-emerald-700",
+            active: statusFilter === "active",
+            onClick: () => setStatusFilter(statusFilter === "active" ? "all" : "active"),
+          },
+          {
+            label: "Patient Plans",
+            value: patientPlansCount,
+            sub: "Diet & consultation tiers",
+            icon: User,
+            color: "text-orange-600",
+            border: "border-orange-200",
+            bg: "bg-orange-50 text-orange-700",
+            active: activeTab === "patient",
+            onClick: () => setActiveTab("patient"),
+          },
+          {
+            label: "Nutritionist Plans",
+            value: nutritionistPlansCount,
+            sub: "Clinical SaaS packages",
+            icon: Stethoscope,
+            color: "text-blue-600",
+            border: "border-blue-200",
+            bg: "bg-blue-50 text-blue-700",
+            active: activeTab === "nutritionist",
+            onClick: () => setActiveTab("nutritionist"),
+          },
+          {
+            label: "Starting Tier Price",
+            value: `₹${minPrice.toLocaleString()}`,
+            sub: "Lowest accessible plan",
+            icon: IndianRupee,
+            color: "text-purple-600",
+            border: "border-purple-200",
+            bg: "bg-purple-50 text-purple-700",
+            active: false,
+            onClick: () => { setStatusFilter("all"); setSearch(""); },
+          },
+        ].map(({ label, value, sub, icon: Icon, color, border, bg, active, onClick }) => (
+          <div
+            key={label}
+            onClick={onClick}
+            className={`p-4 md:p-5 rounded-2xl border transition-all duration-200 cursor-pointer shadow-xs hover:-translate-y-0.5 ${
+              active
+                ? `${border} ring-2 ring-orange-500/20 bg-white shadow-md`
+                : "bg-white border-slate-200/80 hover:border-slate-300"
+            }`}
+          >
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{label}</span>
+              <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${bg}`}>
+                <Icon size={16} />
+              </div>
+            </div>
+            <p className={`text-2xl md:text-3xl font-black ${color} tracking-tight`}>
+              {loading ? "—" : value}
+            </p>
+            <p className="text-[11px] text-slate-400 font-medium mt-1">{sub}</p>
+          </div>
+        ))}
+      </div>
 
-  <button
-    onClick={() => setActiveTab("nutritionist")}
-    className={`px-5 py-2 rounded-xl text-sm font-semibold transition cursor-pointer ${
-      activeTab === "nutritionist"
-        ? "bg-orange-500 text-white"
-        : "bg-white border border-gray-200 text-gray-600 hover:border-orange-300"
-    }`}
-  >
-    Nutritionist Plans
-  </button>
-</div>
+      {/* Tabs & Filters */}
+      <div className="bg-white rounded-2xl border border-slate-200/80 p-4 md:p-5 shadow-xs space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          {/* Segmented Tabs */}
+          <div className="flex p-1 bg-slate-100 rounded-xl w-full sm:w-auto">
+            <button
+              onClick={() => setActiveTab("patient")}
+              className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-xs md:text-sm font-bold transition cursor-pointer ${
+                activeTab === "patient"
+                  ? "bg-white text-orange-600 shadow-xs"
+                  : "text-slate-500 hover:text-slate-800"
+              }`}
+            >
+              <User size={15} />
+              Patient Membership Plans
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-orange-100 text-orange-600">
+                {patientPlansCount}
+              </span>
+            </button>
 
-      {/* Content */}
+            <button
+              onClick={() => setActiveTab("nutritionist")}
+              className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-xs md:text-sm font-bold transition cursor-pointer ${
+                activeTab === "nutritionist"
+                  ? "bg-white text-blue-600 shadow-xs"
+                  : "text-slate-500 hover:text-slate-800"
+              }`}
+            >
+              <Stethoscope size={15} />
+              Nutritionist Clinical Plans
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-blue-100 text-blue-600">
+                {nutritionistPlansCount}
+              </span>
+            </button>
+          </div>
+
+          {/* Quick Stats */}
+          <div className="hidden lg:flex items-center gap-3 text-xs text-slate-500 font-semibold">
+            <span className="flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+              {plans.filter(p => p.is_active).length} Active Tiers
+            </span>
+            <span className="text-slate-300">|</span>
+            <span className="flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-slate-400"></span>
+              {plans.filter(p => !p.is_active).length} Archived
+            </span>
+          </div>
+        </div>
+
+        {/* Search & Status Filters */}
+        <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
+          <div className="relative flex-1">
+            <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Search plan tier by name..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full pl-9 pr-4 py-2 text-xs md:text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400/20 focus:border-orange-500 focus:bg-white transition font-medium"
+            />
+          </div>
+
+          <div className="flex items-center gap-1.5 shrink-0 overflow-x-auto pb-1 sm:pb-0">
+            {[
+              { id: "all", label: "All Statuses" },
+              { id: "active", label: "Active Only" },
+              { id: "inactive", label: "Archived" },
+            ].map((p) => (
+              <button
+                key={p.id}
+                onClick={() => setStatusFilter(p.id)}
+                className={`px-3 py-2 rounded-xl text-xs font-bold transition cursor-pointer shrink-0 ${
+                  statusFilter === p.id
+                    ? "bg-slate-900 text-white shadow-xs"
+                    : "bg-slate-50 text-slate-600 border border-slate-200 hover:bg-slate-100"
+                }`}
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Plans Grid */}
       {loading ? (
-        <div className="flex items-center justify-center py-24">
-          <Loader2 size={28} className="animate-spin text-orange-400" />
+        <div className="flex flex-col items-center justify-center py-28 bg-white rounded-3xl border border-slate-200/80">
+          <Loader2 size={36} className="animate-spin text-orange-500 mb-2" />
+          <span className="text-xs font-bold text-slate-500">Loading plan tiers...</span>
         </div>
       ) : error ? (
-        <div className="text-center py-24 text-red-400 text-sm">{error}</div>
+        <div className="p-8 text-center bg-white rounded-2xl border border-rose-200 text-rose-600 font-bold text-xs">
+          {error}
+        </div>
+      ) : filteredPlans.length === 0 ? (
+        <div className="p-16 text-center bg-white rounded-3xl border border-slate-200/80">
+          <Crown size={36} className="text-slate-300 mx-auto mb-2" />
+          <p className="text-sm font-bold text-slate-700">No subscription tiers found</p>
+          <p className="text-xs text-slate-400 mt-1">Adjust search parameters or create a new plan.</p>
+        </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
-         {filteredPlans.map((plan, i) => (
+          {filteredPlans.map((plan) => (
             <PlanCard
               key={plan.id}
               plan={plan}
-              accent={planAccentColors[i % planAccentColors.length]}
               onEdit={() => setModal({ mode: "edit", plan })}
               onToggleActive={() => handleToggleActive(plan)}
               isToggling={togglingId === plan.id}
@@ -161,67 +362,118 @@ const [activeTab, setActiveTab] = useState("patient");
   );
 }
 
-function PlanCard({ plan, accent, onEdit, onToggleActive, isToggling }) {
+function PlanCard({ plan, onEdit, onToggleActive, isToggling }) {
+  const isNutri = plan.plan_type === "nutritionist";
+  const featureList = isNutri ? NUTRITIONIST_FEATURE_FIELDS : PATIENT_FEATURE_FIELDS;
+
   return (
-    <div className={`bg-white rounded-2xl border-2 shadow-sm overflow-hidden transition-all ${plan.is_active ? "border-orange-400" : "border-gray-200 grayscale-[0.3] opacity-80"}`}>
+    <div className={`bg-white rounded-3xl border shadow-xs overflow-hidden flex flex-col transition-all duration-200 hover:shadow-md ${
+      plan.is_active
+        ? (isNutri ? "border-blue-200/80 hover:border-blue-300" : "border-orange-200/80 hover:border-orange-300")
+        : "border-slate-200 opacity-75"
+    }`}>
       {/* Header */}
-      <div className={`px-5 py-4 ${plan.is_active ? "bg-orange-50" : "bg-gray-50"}`}>
-        <div className="flex items-start justify-between">
+      <div className={`p-6 border-b ${
+        plan.is_active
+          ? (isNutri ? "bg-gradient-to-br from-blue-50/60 to-transparent border-blue-100" : "bg-gradient-to-br from-orange-50/60 to-transparent border-orange-100")
+          : "bg-slate-50 border-slate-100"
+      }`}>
+        <div className="flex items-start justify-between gap-3">
           <div>
             <div className="flex items-center gap-2">
-              {plan.is_active && <Crown size={14} className="text-orange-500" />}
-              <h3 className="text-lg font-bold text-gray-900">{plan.name}</h3>
-              <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
-                plan.plan_type === "nutritionist"
-                  ? "bg-purple-100 text-purple-700"
-                  : "bg-blue-100 text-blue-700"
+              <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${
+                isNutri ? "bg-blue-100 text-blue-700" : "bg-orange-100 text-orange-700"
               }`}>
-                {plan.plan_type === "nutritionist" ? "Nutritionist" : "Patient"}
+                {isNutri ? "🧑‍⚕️ Nutritionist Tier" : "👤 Patient Tier"}
+              </span>
+              <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                plan.is_active ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : "bg-slate-100 text-slate-500"
+              }`}>
+                <span className={`w-1.5 h-1.5 rounded-full ${plan.is_active ? "bg-emerald-500" : "bg-slate-400"}`}></span>
+                {plan.is_active ? "Active" : "Archived"}
               </span>
             </div>
-            <p className="text-2xl font-bold text-orange-500 mt-1">
-              Rs {plan.price?.toLocaleString()}
-              <span className="text-sm font-normal text-gray-400 ml-1">/ {plan.duration_days} days</span>
-            </p>
+            <h3 className="text-xl font-black text-slate-900 mt-2.5 tracking-tight">{plan.name}</h3>
+            <div className="flex items-baseline gap-1 mt-1">
+              <span className="text-3xl font-black text-slate-900 tracking-tight">
+                ₹{(plan.price || 0).toLocaleString()}
+              </span>
+              <span className="text-xs font-bold text-slate-400">
+                / {plan.duration_days} days
+              </span>
+            </div>
           </div>
-          <span className={`text-xs font-semibold px-2.5 py-1 rounded-full flex items-center gap-1.5 ${plan.is_active ? "bg-green-100 text-green-700" : "bg-red-50 text-red-600"}`}>
-            <span className={`w-1.5 h-1.5 rounded-full ${plan.is_active ? "bg-green-500" : "bg-red-500"}`}></span>
-            {plan.is_active ? "Active" : "Inactive"}
-          </span>
         </div>
       </div>
 
-      {/* Features */}
-      <div className="px-5 py-4 space-y-2">
-        {FEATURE_FIELDS.map(({ key, label }) => (
-          <div key={key} className="flex items-center gap-2">
-            {plan[key] ? (
-              <Check size={14} className="text-green-500 shrink-0" />
-            ) : (
-              <X size={14} className="text-gray-300 shrink-0" />
-            )}
-            <span className={`text-sm ${plan[key] ? "text-gray-700" : "text-gray-400"}`}>{label}</span>
-          </div>
-        ))}
-        <div className="flex items-center gap-2 pt-1 border-t border-gray-100 mt-2">
-          <Check size={14} className={plan.inhouse_consults > 0 ? "text-green-500" : "text-gray-300"} />
-          <span className="text-sm text-gray-600">In-house Consults: <span className="font-semibold">{plan.inhouse_consults}</span></span>
-        </div>
-        <div className="flex items-center gap-2">
-          <Check size={14} className={plan.expert_consults > 0 ? "text-green-500" : "text-gray-300"} />
-          <span className="text-sm text-gray-600">Expert Consults: <span className="font-semibold">{plan.expert_consults}</span></span>
+      {/* Feature Checklist */}
+      <div className="p-6 flex-1 space-y-2.5 text-xs">
+        <p className="font-extrabold text-[10px] text-slate-400 uppercase tracking-widest mb-3">
+          {isNutri ? "Clinical & Tool Access" : "Member Privileges"}
+        </p>
+
+        {featureList.map(({ key, label }) => {
+          const enabled = Boolean(plan[key]);
+          return (
+            <div key={key} className="flex items-center gap-2.5">
+              <div className={`w-4 h-4 rounded-md flex items-center justify-center shrink-0 ${
+                enabled ? (isNutri ? "bg-blue-100 text-blue-600" : "bg-emerald-100 text-emerald-600") : "bg-slate-100 text-slate-300"
+              }`}>
+                {enabled ? <Check size={11} strokeWidth={3} /> : <X size={9} strokeWidth={2.5} />}
+              </div>
+              <span className={`font-medium ${enabled ? "text-slate-800 font-bold" : "text-slate-400 line-through"}`}>
+                {label}
+              </span>
+            </div>
+          );
+        })}
+
+        {/* Capacity / Consultations Limits */}
+        <div className="pt-4 border-t border-slate-100 space-y-2 mt-4">
+          {isNutri ? (
+            <div className="flex items-center justify-between bg-blue-50/50 p-3 rounded-2xl border border-blue-100">
+              <span className="text-slate-600 font-bold text-xs">Assigned Patient Limit:</span>
+              <span className="font-black text-blue-700 text-xs">
+                {plan.nutri_max_patients ? `${plan.nutri_max_patients} Patients` : "Unlimited Patients"}
+              </span>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 gap-2 text-center">
+              <div className="bg-orange-50/50 p-2.5 rounded-2xl border border-orange-100">
+                <span className="text-[10px] text-slate-500 font-bold block uppercase tracking-wider">In-House</span>
+                <span className="text-sm font-black text-orange-600">
+                  {plan.inhouse_consults ? `${plan.inhouse_consults} sessions` : "Unlimited"}
+                </span>
+              </div>
+              <div className="bg-purple-50/50 p-2.5 rounded-2xl border border-purple-100">
+                <span className="text-[10px] text-slate-500 font-bold block uppercase tracking-wider">Specialist Expert</span>
+                <span className="text-sm font-black text-purple-600">
+                  {plan.expert_consults ? `${plan.expert_consults} sessions` : "Unlimited"}
+                </span>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Actions */}
-      <div className="px-5 py-3 border-t border-gray-100 flex gap-2">
-        <button onClick={onEdit}
-          className="flex-1 flex items-center justify-center gap-1.5 py-2 text-sm font-medium text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 transition cursor-pointer">
-          <Pencil size={14} /> Edit
+      {/* Action Footer */}
+      <div className="px-6 py-4 bg-slate-50/80 border-t border-slate-100 flex gap-2">
+        <button
+          onClick={onEdit}
+          className="flex-1 flex items-center justify-center gap-1.5 py-2 px-3 text-xs font-bold text-slate-700 bg-white border border-slate-200 rounded-xl hover:bg-slate-100 transition cursor-pointer shadow-2xs"
+        >
+          <Pencil size={12} /> Edit Tier
         </button>
-        <button onClick={onToggleActive} disabled={isToggling}
-          className={`flex-1 flex items-center justify-center gap-1.5 py-2 text-sm font-medium rounded-lg transition cursor-pointer ${plan.is_active ? 'text-gray-600 bg-gray-100 hover:bg-gray-200' : 'text-green-700 bg-green-100 hover:bg-green-200'} disabled:opacity-50`}>
-          {isToggling ? <Loader2 size={14} className="animate-spin" /> : (plan.is_active ? <PowerOff size={14} /> : <Power size={14} />)} 
+        <button
+          onClick={onToggleActive}
+          disabled={isToggling}
+          className={`flex-1 flex items-center justify-center gap-1.5 py-2 px-3 text-xs font-bold rounded-xl transition cursor-pointer disabled:opacity-50 ${
+            plan.is_active
+              ? "text-rose-600 bg-rose-50 hover:bg-rose-100 border border-rose-200"
+              : "text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200"
+          }`}
+        >
+          {isToggling ? <Loader2 size={13} className="animate-spin" /> : (plan.is_active ? <PowerOff size={13} /> : <Power size={13} />)}
           {plan.is_active ? "Deactivate" : "Activate"}
         </button>
       </div>
@@ -229,149 +481,229 @@ function PlanCard({ plan, accent, onEdit, onToggleActive, isToggling }) {
   );
 }
 
-function PlanModal({ mode, plan, onClose, onSave }) {
-  const [form, setForm] = useState(plan ? { ...plan } : { ...EMPTY_FORM });
+function PlanModal({ mode, plan, initialPlanType, onClose, onSave }) {
+  const [form, setForm] = useState(plan ? { ...plan } : { ...EMPTY_FORM, plan_type: initialPlanType || "patient" });
   const [saving, setSaving] = useState(false);
 
+  const isNutri = form.plan_type === "nutritionist";
+
   const toggle = (key) => setForm((f) => ({ ...f, [key]: !f[key] }));
-  const set = (key, val) => setForm((f) => ({ ...f, [key]: val }));
+  const setVal = (key, val) => setForm((f) => ({ ...f, [key]: val }));
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setSaving(true);
     try {
-      // Convert numeric fields to numbers
-      const submitData = {
+      const payload = {
         ...form,
         price: parseInt(form.price) || 0,
         duration_days: parseInt(form.duration_days) || 0,
         inhouse_consults: parseInt(form.inhouse_consults) || 0,
         expert_consults: parseInt(form.expert_consults) || 0,
-        inhouse_consultation_fee: parseInt(form.inhouse_consultation_fee) || 0,
-        expert_consultation_fee: parseInt(form.expert_consultation_fee) || 0,
+        nutri_max_patients: parseInt(form.nutri_max_patients) || 0,
       };
 
-      if (mode === "edit") {
-        await api.updatePlan(plan.id, submitData);
+      if (mode === "add") {
+        await api.createPlan(payload);
       } else {
-        await api.createPlan(submitData);
+        await api.updatePlan(plan.id, payload);
       }
       onSave();
     } catch (err) {
-      alert(err.message);
+      alert("Error saving plan: " + err.message);
     } finally {
       setSaving(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 bg-black/40 z-[100] flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between p-5 border-b border-gray-100">
-          <h2 className="text-lg font-bold text-gray-900">{mode === "edit" ? "Edit Plan" : "Add Plan"}</h2>
-          <button onClick={onClose} className="p-2 rounded-lg hover:bg-gray-100 cursor-pointer">
-            <X size={18} className="text-gray-500" />
+    <div className="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm overflow-y-auto animate-in fade-in duration-200">
+      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl my-8 overflow-hidden border border-slate-100">
+        {/* Header */}
+        <div className="flex items-center justify-between p-6 border-b border-slate-100 bg-gradient-to-r from-orange-50/70 to-white">
+          <div>
+            <h2 className="text-xl font-black text-slate-900 tracking-tight">
+              {mode === "add" ? "Create New Subscription Tier" : `Edit Plan: ${plan.name}`}
+            </h2>
+            <p className="text-xs text-slate-500 mt-0.5">Define duration, pricing, and enabled clinical privileges</p>
+          </div>
+          <button onClick={onClose} className="p-2 rounded-xl hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition cursor-pointer">
+            <X size={18} />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-5 space-y-4">
-          {/* Plan Type Selection */}
+        <form onSubmit={handleSubmit} className="p-6 space-y-5 max-h-[80vh] overflow-y-auto">
+          {/* Target Audience */}
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-2">Plan Type</label>
+            <label className="block text-[11px] font-extrabold text-slate-500 uppercase tracking-wider mb-2">Target Audience</label>
             <div className="grid grid-cols-2 gap-3">
               <button
                 type="button"
-                onClick={() => set("plan_type", "patient")}
-                className={`px-4 py-3 rounded-lg border-2 font-medium text-sm transition cursor-pointer ${
+                onClick={() => setVal("plan_type", "patient")}
+                className={`flex items-center justify-center gap-2 p-3 rounded-2xl border text-xs font-bold transition cursor-pointer ${
                   form.plan_type === "patient"
-                    ? "border-orange-500 bg-orange-50 text-orange-700"
-                    : "border-gray-200 bg-white text-gray-600 hover:border-gray-300"
+                    ? "bg-orange-50 border-orange-500 text-orange-600 shadow-xs"
+                    : "border-slate-200 text-slate-500 hover:border-slate-300"
                 }`}
               >
-                👤 Patient Plan
+                <User size={15} /> Patient Plan
               </button>
               <button
                 type="button"
-                onClick={() => set("plan_type", "nutritionist")}
-                className={`px-4 py-3 rounded-lg border-2 font-medium text-sm transition cursor-pointer ${
+                onClick={() => setVal("plan_type", "nutritionist")}
+                className={`flex items-center justify-center gap-2 p-3 rounded-2xl border text-xs font-bold transition cursor-pointer ${
                   form.plan_type === "nutritionist"
-                    ? "border-orange-500 bg-orange-50 text-orange-700"
-                    : "border-gray-200 bg-white text-gray-600 hover:border-gray-300"
+                    ? "bg-blue-50 border-blue-500 text-blue-600 shadow-xs"
+                    : "border-slate-200 text-slate-500 hover:border-slate-300"
                 }`}
               >
-                👨‍⚕️ Nutritionist Plan
+                <Stethoscope size={15} /> Nutritionist Plan
               </button>
             </div>
           </div>
 
-          {/* Basic fields */}
-          <div className="grid grid-cols-2 gap-3">
+          {/* Basic Info */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">Plan Name</label>
-              <input required value={form.name} onChange={(e) => set("name", e.target.value)}
-                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-300" />
+              <label className="block text-[11px] font-bold text-slate-700 mb-1">Plan Name *</label>
+              <input
+                type="text"
+                required
+                value={form.name}
+                onChange={(e) => setVal("name", e.target.value)}
+                placeholder="Hero, Silver, Pro"
+                className="w-full px-3.5 py-2.5 text-xs md:text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400/20 focus:border-orange-500 font-semibold"
+              />
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">Price (Rs)</label>
-              <input required type="number" min="0" value={form.price} onChange={(e) => set("price", e.target.value)}
-                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-300" />
+              <label className="block text-[11px] font-bold text-slate-700 mb-1">Price (₹) *</label>
+              <input
+                type="number"
+                required
+                min="0"
+                value={form.price}
+                onChange={(e) => setVal("price", e.target.value)}
+                placeholder="999"
+                className="w-full px-3.5 py-2.5 text-xs md:text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400/20 focus:border-orange-500 font-semibold"
+              />
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">Duration (days)</label>
-              <input required type="number" min="1" value={form.duration_days} onChange={(e) => set("duration_days", e.target.value)}
-                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-300" />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">In-house Consults</label>
-              <input type="number" min="0" value={form.inhouse_consults} onChange={(e) => set("inhouse_consults", e.target.value)}
-                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-300" />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">Expert Consults</label>
-              <input type="number" min="0" value={form.expert_consults} onChange={(e) => set("expert_consults", e.target.value)}
-                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-300" />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">In-house Consultation Fee (Rs)</label>
-              <input type="number" min="0" value={form.inhouse_consultation_fee} onChange={(e) => set("inhouse_consultation_fee", e.target.value)}
-                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-300" />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">Expert Consultation Fee (Rs)</label>
-              <input type="number" min="0" value={form.expert_consultation_fee} onChange={(e) => set("expert_consultation_fee", e.target.value)}
-                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-300" />
+              <label className="block text-[11px] font-bold text-slate-700 mb-1">Duration (Days) *</label>
+              <input
+                type="number"
+                required
+                min="1"
+                value={form.duration_days}
+                onChange={(e) => setVal("duration_days", e.target.value)}
+                placeholder="30"
+                className="w-full px-3.5 py-2.5 text-xs md:text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400/20 focus:border-orange-500 font-semibold"
+              />
             </div>
           </div>
 
-          {/* Features */}
+          {/* Conditional Consultation / Capacity Limits */}
+          <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200/80">
+            <h4 className="text-[11px] font-extrabold text-slate-600 uppercase tracking-wider mb-2.5">
+              {isNutri ? "Practitioner Patient Capacity" : "Included Consultations (0 = Unlimited)"}
+            </h4>
+            {isNutri ? (
+              <div>
+                <label className="block text-xs font-bold text-slate-600 mb-1">Maximum Assigned Patients</label>
+                <input
+                  type="number"
+                  min="0"
+                  value={form.nutri_max_patients || 0}
+                  onChange={(e) => setVal("nutri_max_patients", e.target.value)}
+                  className="w-full sm:w-48 px-3.5 py-2 text-xs md:text-sm bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400/20 font-bold"
+                />
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-600 mb-1">In-House Consultations</label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={form.inhouse_consults || 0}
+                    onChange={(e) => setVal("inhouse_consults", e.target.value)}
+                    className="w-full px-3.5 py-2 text-xs md:text-sm bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400/20 font-bold"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-600 mb-1">Specialist Consultations</label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={form.expert_consults || 0}
+                    onChange={(e) => setVal("expert_consults", e.target.value)}
+                    className="w-full px-3.5 py-2 text-xs md:text-sm bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400/20 font-bold"
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Feature Toggles */}
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-2">Features</label>
-            <div className="grid grid-cols-2 gap-2">
-              {FEATURE_FIELDS.map(({ key, label }) => (
-                <label key={key} className="flex items-center gap-2 cursor-pointer select-none">
-                  <input type="checkbox" checked={!!form[key]} onChange={() => toggle(key)}
-                    className="w-4 h-4 accent-orange-500 cursor-pointer" />
-                  <span className="text-sm text-gray-700">{label}</span>
+            <h4 className="text-[11px] font-extrabold text-slate-500 uppercase tracking-wider mb-2.5">
+              {isNutri ? "Nutritionist Permissions & Clinical Tools" : "Patient Features Enabled"}
+            </h4>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {(isNutri ? NUTRITIONIST_FEATURE_FIELDS : PATIENT_FEATURE_FIELDS).map(({ key, label }) => (
+                <label
+                  key={key}
+                  onClick={() => toggle(key)}
+                  className={`flex items-center justify-between p-3 rounded-2xl border transition cursor-pointer select-none ${
+                    form[key]
+                      ? (isNutri ? "bg-blue-50/50 border-blue-300 text-blue-900" : "bg-orange-50/50 border-orange-300 text-orange-900")
+                      : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
+                  }`}
+                >
+                  <span className="text-xs font-bold">{label}</span>
+                  <div className={`w-5 h-5 rounded-lg flex items-center justify-center transition ${
+                    form[key] ? (isNutri ? "bg-blue-600 text-white" : "bg-orange-500 text-white") : "bg-slate-100 text-transparent"
+                  }`}>
+                    <Check size={12} strokeWidth={3} />
+                  </div>
                 </label>
               ))}
             </div>
           </div>
 
-          {/* Active toggle */}
-          <label className="flex items-center gap-2 cursor-pointer select-none">
-            <input type="checkbox" checked={!!form.is_active} onChange={() => toggle("is_active")}
-              className="w-4 h-4 accent-orange-500 cursor-pointer" />
-            <span className="text-sm font-medium text-gray-700">Mark as Active</span>
-          </label>
+          {/* Active Status */}
+          <div className="flex items-center justify-between pt-3 border-t border-slate-100">
+            <div>
+              <span className="text-xs font-bold text-slate-800 block">Plan Active Status</span>
+              <span className="text-[11px] text-slate-400">Archived tiers won't be offered on patient checkout</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => toggle("is_active")}
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
+                form.is_active ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-500"
+              }`}
+            >
+              {form.is_active ? "Active" : "Archived"}
+            </button>
+          </div>
 
-          <div className="flex gap-3 pt-2">
-            <button type="button" onClick={onClose}
-              className="flex-1 px-4 py-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-50 transition cursor-pointer">
+          {/* Actions */}
+          <div className="flex gap-3 pt-3 border-t border-slate-100">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 px-4 py-2.5 text-xs font-bold border border-slate-200 rounded-xl hover:bg-slate-50 transition cursor-pointer text-slate-700"
+            >
               Cancel
             </button>
-            <button type="submit" disabled={saving}
-              className="flex-1 px-4 py-2 text-sm bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition cursor-pointer disabled:opacity-60">
-              {saving ? "Saving..." : mode === "edit" ? "Save Changes" : "Create Plan"}
+            <button
+              type="submit"
+              disabled={saving}
+              className="flex-1 px-4 py-2.5 text-xs font-bold bg-orange-500 hover:bg-orange-600 text-white rounded-xl shadow-sm shadow-orange-500/20 transition cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2"
+            >
+              {saving ? <Loader2 size={14} className="animate-spin" /> : null}
+              {saving ? "Saving..." : (mode === "add" ? "Create Tier" : "Save Changes")}
             </button>
           </div>
         </form>

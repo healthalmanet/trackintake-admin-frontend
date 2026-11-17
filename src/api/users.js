@@ -50,6 +50,21 @@ export const deleteUser = async (id) => {
   return res.json();
 };
 
+export const toggleUserStatus = async (userId, isActive = null) => {
+  const body = isActive !== null ? JSON.stringify({ is_active: isActive }) : JSON.stringify({});
+  const res = await fetch(`${BASE}/${userId}/toggle-status/`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: body,
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || err.message || "Failed to update user account status");
+  }
+  return res.json();
+};
+
+
 export const assignNutritionist = async (userId, nutritionistId) => {
   const res = await fetch(`${BASE}/assign-nutritionist/`, {
     method: "POST",
