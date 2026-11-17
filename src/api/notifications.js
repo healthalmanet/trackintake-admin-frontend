@@ -19,3 +19,13 @@ export const markAllNotificationsRead = async (type = "admin") => {
   if (!res.ok) throw new Error("Failed to mark all notifications as read");
   return res.json();
 };
+
+export const triggerNotificationEvent = async (event, data = {}) => {
+  const res = await fetch(`${BASE}/admin-notifications/trigger-event/`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ event, data }),
+  });
+  if (!res.ok) throw new Error("Failed to trigger event");
+  return res.json();
+};

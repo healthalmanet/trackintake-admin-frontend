@@ -50,6 +50,21 @@ export const deleteUser = async (id) => {
   return res.json();
 };
 
+export const toggleUserStatus = async (userId, isActive = null) => {
+  const body = isActive !== null ? JSON.stringify({ is_active: isActive }) : JSON.stringify({});
+  const res = await fetch(`${BASE}/${userId}/toggle-status/`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: body,
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || err.message || "Failed to update user account status");
+  }
+  return res.json();
+};
+
+
 export const assignNutritionist = async (userId, nutritionistId) => {
   const res = await fetch(`${BASE}/assign-nutritionist/`, {
     method: "POST",
@@ -62,8 +77,21 @@ export const assignNutritionist = async (userId, nutritionistId) => {
 };
 
 export const getNutritionists = async () => {
-  const res = await fetch(`${BASE}/nutritionists/`);
+  const res = await fetch(`${API_BASE_URL}/api/nutritionist/list/`);
   if (!res.ok) throw new Error("Failed to fetch nutritionists");
+  const data = await res.json();
+  return data.data || data;
+};
+
+export const getPatientAssignments = async () => {
+  const res = await fetch(`${API_BASE_URL}/api/nutritionist/assignments/`);
+  if (!res.ok) throw new Error("Failed to fetch assignments");
+  return res.json();
+};
+
+export const getNutritionistById = async (id) => {
+  const res = await fetch(`${API_BASE_URL}/api/nutritionist/${id}/`);
+  if (!res.ok) throw new Error("Failed to fetch nutritionist");
   return res.json();
 };
 

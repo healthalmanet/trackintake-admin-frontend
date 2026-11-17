@@ -5,24 +5,21 @@ import Dashboard from "./pages/Dashboard";
 import UserManagement from "./pages/UserManagement";
 import SubscriptionPlans from "./pages/SubscriptionPlans";
 import SubscriptionPayments from "./pages/SubscriptionPayments";
-import Notifications from "./pages/Notifications";
-import Nutritionists from "./pages/Nutritionists";
-import DietPlansMain from "./pages/DietPlansMain";
+import Appointments from "./pages/Appointments";
+import Blogs from "./pages/Blogs";
 import AdminLogin from "./pages/AdminLogin";
-
-function PlaceholderPage({ title }) {
-  return (
-    <div className="p-6">
-      <h1 className="text-2xl font-bold text-gray-900">{title}</h1>
-      <p className="text-sm text-gray-500 mt-1">This section is under construction.</p>
-    </div>
-  );
-}
+import ApproveProfiles from "./pages/ApproveProfiles";
+import Payables from "./pages/Payables";
+import Settings from "./pages/Settings";
+import PatientAssignment from "./pages/PatientAssignment";
+import Notifications from "./pages/Notifications";
+import NotificationToastContainer from "./components/NotificationToastContainer";
+import { useNotificationPolling } from "./utils/useNotificationPolling";
 
 export default function App() {
   const [activePage, setActivePage] = useState(() => sessionStorage.getItem("activePage") || "dashboard");
   const [pageState, setPageState] = useState({});
-  const [unreadCount, setUnreadCount] = useState(0);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(() => {
     return localStorage.getItem("isAdmin") === "true";
   });
@@ -31,18 +28,18 @@ export default function App() {
     return stored ? JSON.parse(stored) : null;
   });
 
-  // Fetch unread notification count on load
-  useEffect(() => {
-    if (!isAuthenticated) return;
-    
-    fetch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'}/api/notifications/admin-notifications/`)
-      .then(r => r.ok ? r.json() : { results: [] })
-      .then(data => {
-        const list = data.results || [];
-        setUnreadCount(list.filter(n => !n.is_read).length);
-      })
-      .catch(() => {});
-  }, [isAuthenticated]);
+  // REST API Notification Polling & In-App Alerts (every 1 minute)
+  const {
+    unreadCount,
+    setUnreadCount,
+    recentNotifications,
+    toasts,
+    removeToast,
+    refresh: refreshNotifications,
+  } = useNotificationPolling({
+    enabled: isAuthenticated,
+    intervalMs: 60000, // 1 minute interval
+  });
 
   const handleLoginSuccess = (userData) => {
     setUser(userData);
@@ -62,6 +59,7 @@ export default function App() {
   const handleNavigate = (page) => {
     sessionStorage.setItem("activePage", page);
     setActivePage(page);
+    setSidebarOpen(false);
   };
 
   useEffect(() => {
@@ -77,29 +75,42 @@ export default function App() {
     switch (activePage) {
       case "dashboard": return <Dashboard pageState={pageState} />;
       case "users": return <UserManagement pageState={pageState} />;
+      case "assignments": return <PatientAssignment pageState={pageState} />;
+      case "approvals": return <ApproveProfiles />;
       case "plans": return <SubscriptionPlans />;
       case "payments": return <SubscriptionPayments pageState={pageState} />;
-      case "nutritionists": return <Nutritionists />;
+      case "appointments": return <Appointments pageState={pageState} />;
+      case "payables": return <Payables />;
+      case "blogs": return <Blogs />;
+      case "settings": return <Settings />;
       case "notifications": return <Notifications onUnreadChange={setUnreadCount} />;
-      case "meals": return <PlaceholderPage title="Meals" />;
-      case "diet": return <DietPlansMain />;
-      case "progress": return <PlaceholderPage title="Progress" />;
-      case "appointments": return <PlaceholderPage title="Appointments" />;
-      case "blogs": return <PlaceholderPage title="Blogs" />;
-      case "settings": return <PlaceholderPage title="Settings" />;
-      default: return <PlaceholderPage title="Page" />;
+      default: return <Dashboard pageState={pageState} />;
     }
   };
 
   return (
     <>
+      <NotificationToastContainer toasts={toasts} onDismiss={removeToast} onNavigate={handleNavigate} />
       {!isAuthenticated ? (
         <AdminLogin onLoginSuccess={handleLoginSuccess} />
       ) : (
         <div className="flex h-screen bg-gray-50 overflow-hidden flex-col md:flex-row">
-          <Sidebar active={activePage} onNavigate={handleNavigate} />
-          <div className="flex-1 flex flex-col overflow-hidden w-full">
-            <Navbar unreadCount={unreadCount} onNotificationClick={() => handleNavigate("notifications")} onLogout={handleLogout} />
+          <Sidebar
+            active={activePage}
+            unreadCount={unreadCount}
+            onNavigate={handleNavigate}
+            isOpen={sidebarOpen}
+            onClose={() => setSidebarOpen(false)}
+          />
+          <div className="flex-1 flex flex-col overflow-hidden w-full min-w-0">
+            <Navbar
+              unreadCount={unreadCount}
+              activePage={activePage}
+              onNotificationClick={() => handleNavigate("notifications")}
+              onNavigate={handleNavigate}
+              onLogout={handleLogout}
+              onToggleSidebar={() => setSidebarOpen(prev => !prev)}
+            />
             <main className="flex-1 overflow-y-auto">
               {renderPage()}
             </main>
