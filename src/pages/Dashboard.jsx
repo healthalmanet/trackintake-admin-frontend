@@ -1,393 +1,893 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import {
   Users, UserCheck, CalendarCheck, IndianRupee,
-  TrendingUp, TrendingDown, Loader2, Calendar as CalendarIcon, Clock, Activity, BarChart2, ChevronDown, PieChart as PieChartIcon
+  TrendingUp, Loader2, Calendar as CalendarIcon, Clock, Activity,
+  BarChart2, ChevronDown, PieChart as PieChartIcon, Building2,
+  Award, Sparkles, Video, CheckCircle2, AlertCircle, RefreshCw,
+  ArrowRight, ShieldCheck, Stethoscope
 } from "lucide-react";
 import {
   LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer,
   BarChart, Bar, Cell, PieChart, Pie, AreaChart, Area, CartesianGrid
 } from "recharts";
-import { getDashboardStats } from "../api/dashboard";
+import { getDashboardOverview } from "../api/dashboard";
 
-const PLAN_COLORS = { free: "#9ca3af", basic: "#3b82f6", hero: "#f97316", silver: "#a855f7" };
-const PLAN_COLOR_LIST = ["#f97316", "#3b82f6", "#a855f7", "#22c55e", "#eab308"];
+const PLAN_COLORS = ["#f97316", "#3b82f6", "#a855f7", "#22c55e", "#eab308", "#ec4899", "#6366f1"];
 
-const MEAL_COLORS = ["#f97316", "#3b82f6", "#22c55e", "#eab308", "#a855f7"];
-
-function formatActivity(activities) {
-  const colors = ["bg-orange-100 text-orange-600", "bg-blue-100 text-blue-600", "bg-green-100 text-green-600", "bg-pink-100 text-pink-600", "bg-purple-100 text-purple-600"];
-  
-  return activities.slice(0, 8).map((item, i) => {
-    const name = item.full_name || `User ${item.user_id || 'Unknown'}`;
-    const parts = name.split(" ");
-    
-    const date = new Date(item.date_joined || item.created_at);
-    const diffMins = Math.floor((new Date() - date) / 60000);
-    let ago = "Just now";
-    if (diffMins > 0) {
-      if (diffMins < 60) ago = `${diffMins}m ago`;
-      else if (diffMins < 1440) ago = `${Math.floor(diffMins/60)}h ago`;
-      else ago = `${Math.floor(diffMins/1440)}d ago`;
-    }
-
-    return {
-      initials: parts.map((n) => n[0]).join("").slice(0, 2).toUpperCase() || "U",
-      name: name,
-      action: item.activity,
-      ago: ago,
-      color: colors[i % colors.length],
-    };
-  });
+function formatTimeAgo(dateString) {
+  if (!dateString) return "Recently";
+  const date = new Date(dateString);
+  const diffMins = Math.floor((new Date() - date) / 60000);
+  if (diffMins < 1) return "Just now";
+  if (diffMins < 60) return `${diffMins}m ago`;
+  if (diffMins < 1440) return `${Math.floor(diffMins / 60)}h ago`;
+  const diffDays = Math.floor(diffMins / 1440);
+  if (diffDays === 1) return "Yesterday";
+  if (diffDays < 30) return `${diffDays}d ago`;
+  return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
-function StatCard({ icon: Icon, label, value, color, border, delay, onClick }) {
+function StatCard({ icon: Icon, label, value, subtext, tag, color, border, bgIcon, delay = 0, onClick }) {
   return (
-    <div 
+    <div
       onClick={onClick}
-      className={`bg-white rounded-2xl border-t-[3px] ${border} shadow-sm hover:shadow-md p-5 transition-all duration-500 ease-out transform hover:-translate-y-1.5 opacity-0 animate-[fade-in-up_0.6s_ease-out_forwards] ${onClick ? "cursor-pointer ring-2 ring-transparent hover:ring-orange-200" : ""}`}
+      className={`bg-white rounded-2xl border-t-[3px] ${border} border-x border-b border-slate-200/80 shadow-xs hover:shadow-md p-5 transition-all duration-300 transform hover:-translate-y-1 ${
+        onClick ? "cursor-pointer group ring-1 ring-transparent hover:ring-orange-200" : ""
+      }`}
       style={{ animationDelay: `${delay}ms` }}
     >
-      <div className="flex items-start justify-between">
-        <div>
-          <p className="text-sm text-gray-500 font-medium mb-1 flex items-center gap-1.5">
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex-1 min-w-0">
+          <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">
             {label}
           </p>
-          <p className={`text-3xl font-extrabold tracking-tight ${color}`}>{value}</p>
+          <p className={`text-2xl sm:text-3xl font-black tracking-tight ${color}`}>
+            {value}
+          </p>
+          {(subtext || tag) && (
+            <div className="flex items-center gap-2 mt-2 flex-wrap">
+              {tag && (
+                <span className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-slate-100 text-slate-700">
+                  {tag}
+                </span>
+              )}
+              {subtext && (
+                <span className="text-xs text-slate-400 font-medium truncate">
+                  {subtext}
+                </span>
+              )}
+            </div>
+          )}
         </div>
-        <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${color.replace("text-", "bg-").replace("600", "50").replace("500", "50")} shadow-inner saturate-150`}>
-          <Icon size={24} className={color} strokeWidth={2.5} />
+        <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${bgIcon} shadow-inner shrink-0 group-hover:scale-105 transition-transform`}>
+          <Icon size={22} className={color} strokeWidth={2.5} />
         </div>
       </div>
+      {onClick && (
+        <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between text-xs font-semibold text-slate-400 group-hover:text-orange-500 transition-colors">
+          <span>View records</span>
+          <ArrowRight size={13} className="group-hover:translate-x-0.5 transition-transform" />
+        </div>
+      )}
     </div>
   );
 }
 
-const CustomDot = ({ cx, cy, fill }) => <circle cx={cx} cy={cy} r={4.5} fill={fill || "#f97316"} stroke="#fff" strokeWidth={2.5} className="transition-all duration-300 hover:r-6" />;
+const CustomDot = ({ cx, cy, fill }) => (
+  <circle cx={cx} cy={cy} r={4} fill={fill || "#f97316"} stroke="#fff" strokeWidth={2} />
+);
 
 export default function Dashboard({ pageState }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [timeRange, setTimeRange] = useState("month");
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split("T")[0]);
-  const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7));
-  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear().toString());
-  const [plansMap, setPlansMap] = useState({});
+  const [refreshing, setRefreshing] = useState(false);
+  const [timeRange, setTimeRange] = useState("all");
+  const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().split("T")[0]);
+  const [selectedMonth, setSelectedMonth] = useState(() => new Date().toISOString().slice(0, 7));
+  const [selectedYear, setSelectedYear] = useState(() => new Date().getFullYear().toString());
+  const [activeActivityTab, setActiveActivityTab] = useState("signups");
 
-  // Fetch plans map once
-  useEffect(() => {
-    fetch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'}/api/subscription/plans/`)
-      .then(r => r.ok ? r.json() : [])
-      .then(list => {
-        const m = {};
-        (Array.isArray(list) ? list : []).forEach(p => { m[p.id] = p.name; });
-        setPlansMap(m);
-      })
-      .catch((err) => {
-        console.error('Plans fetch error:', err);
+  const loadData = useCallback(async (isManualRefresh = false) => {
+    if (isManualRefresh) setRefreshing(true);
+    else setLoading(true);
+
+    try {
+      const res = await getDashboardOverview({
+        range: timeRange,
+        date: timeRange === "day" ? selectedDate : timeRange === "month" ? selectedMonth : undefined,
+        month: timeRange === "month" ? selectedMonth.split("-")[1] : undefined,
+        year: timeRange === "month" ? selectedMonth.split("-")[0] : timeRange === "year" ? selectedYear : undefined,
       });
-  }, []);
+
+      if (res && res.status === "success") {
+        setData(res);
+      }
+    } catch (err) {
+      console.error("Dashboard overview fetch error:", err);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, [timeRange, selectedDate, selectedMonth, selectedYear]);
 
   useEffect(() => {
-    setLoading(true);
-    let apiDate = undefined;
-    if (timeRange === "day") apiDate = selectedDate;
-    if (timeRange === "month") apiDate = selectedMonth;
-    if (timeRange === "year") apiDate = selectedYear;
-    // timeRange === "all" → apiDate stays undefined → backend returns all-time data
+    loadData();
+  }, [loadData]);
 
-    // Assuming backend takes ?timeRange=... and optional ?date=...
-    getDashboardStats({ range: timeRange, date: apiDate })
-      .then((res) => {
-        setData({
-          totalUsers: res.totalUsers,
-          activeUsers: res.activeUsers,
-          totalRevenue: res.totalRevenue ?? 0,
-          revenueByPlan: res.revenueByPlan ?? [],
-          pendingAppts: res.pendingAppts ?? 0,
-          growthData: res.userGrowth?.length ? res.userGrowth : [],
-          planDist: (res.planDistribution ?? []).map((p, i) => {
-            // Use plan_name from backend response, fallback to plansMap
-            const planName = p.plan_name || plansMap[p.plan_id] || plansMap[p.plan] || p.plan || `Plan ${p.plan_id}`;
-            return {
-              name: planName,
-              value: p.users ?? p.count ?? 0,
-              pct: res.totalUsers ? Math.round(((p.users ?? p.count ?? 0) / res.totalUsers) * 100) : 0,
-              color: PLAN_COLORS[planName.toLowerCase()] ?? PLAN_COLOR_LIST[i % PLAN_COLOR_LIST.length],
-            };
-          }),
-          revenueTrend: (res.revenueByPlan ?? []).map((p, i) => ({
-            month: p.plan_name || plansMap[p.plan_id] || `Plan ${p.plan_id}`,
-            revenue: p.total_revenue ?? 0,
-          })),
-          mealCats: res.mealCats?.length ? res.mealCats : [],
-          activity: formatActivity(res.recentActivity || []),
-        });
-      })
-      .catch((err) => {
-        console.error('Dashboard data fetch error:', err);
-        console.error('Error details:', err.message);
-        setData(null);
-      })
-      .finally(() => setLoading(false));
-  }, [timeRange, selectedDate, selectedMonth, selectedYear, plansMap]);
-
-  const handleRevenueClick = () => {
-    const targetRange = timeRange === "day" ? "date" : timeRange;
-    const state = { timeRange: targetRange };
-    
-    if (timeRange === "day") state.date = selectedDate;
-    if (timeRange === "month") state.month = selectedMonth;
-    if (timeRange === "year") state.year = selectedYear;
-    
-    window.dispatchEvent(new CustomEvent("app-nav", { detail: { page: "payments", state } }));
+  // Navigation Handlers to relevant pages with filters
+  const navigateTo = (page, state = {}) => {
+    window.dispatchEvent(new CustomEvent("app-nav", { detail: { page, state } }));
   };
 
-  const handleUserClick = (status = "All") => {
-    const mode = timeRange === "day" ? "date" : timeRange;
-    const state = { dateFilterMode: mode, statusFilter: status };
-    
-    if (timeRange === "day") state.dateFilter = selectedDate;
-    if (timeRange === "month") state.dateFilter = selectedMonth;
-    if (timeRange === "year") state.dateFilter = selectedYear;
-    
-    window.dispatchEvent(new CustomEvent("app-nav", { detail: { page: "users", state } }));
-  };
+  const metrics = data?.metrics || {};
+  const charts = data?.charts || {};
+  const recentActivity = data?.recent_activity || {};
 
-  const today = new Date().toLocaleDateString("en-US", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+  // Compute label for the currently active filter
+  const filterLabel = useMemo(() => {
+    if (timeRange === "all") return "All Time Performance";
+    if (timeRange === "day") {
+      return `Date: ${new Date(selectedDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`;
+    }
+    if (timeRange === "week") return "Last 7 Days (Weekly)";
+    if (timeRange === "month") {
+      const [y, m] = selectedMonth.split("-");
+      const d = new Date(parseInt(y), parseInt(m) - 1, 1);
+      return `Month: ${d.toLocaleDateString("en-US", { month: "long", year: "numeric" })}`;
+    }
+    if (timeRange === "year") return `Year: ${selectedYear}`;
+    return "Custom Filter";
+  }, [timeRange, selectedDate, selectedMonth, selectedYear]);
 
+  // Primary Metrics Cards (Clean, 8 Key Performance Indicators)
   const stats = [
-    { icon: IndianRupee, label: "Total Revenue", value: `Rs ${data?.totalRevenue?.toLocaleString() ?? "0"}`, color: "text-orange-500", border: "border-orange-400", delay: 0, onClick: handleRevenueClick },
-    { icon: Users, label: "Total Users", value: data?.totalUsers?.toLocaleString() ?? "0", color: "text-blue-600", border: "border-blue-400", delay: 100, onClick: () => handleUserClick("All") },
-    { icon: UserCheck, label: "Active Users", value: data?.activeUsers?.toLocaleString() ?? "0", color: "text-green-600", border: "border-green-400", delay: 200, onClick: () => handleUserClick("Active") },
-    { icon: CalendarCheck, label: "Pending Appointments", value: data?.pendingAppts ?? "0", color: "text-purple-600", border: "border-purple-400", delay: 300 },
+    {
+      label: "Total Users",
+      value: (metrics.total_users ?? 0).toLocaleString(),
+      tag: `${metrics.active_users ?? 0} active`,
+      subtext: timeRange !== "all" ? `All-time: ${metrics.all_time?.total_users ?? 0}` : "All registered accounts",
+      icon: Users,
+      color: "text-blue-600",
+      border: "border-blue-500",
+      bgIcon: "bg-blue-50",
+      onClick: () => navigateTo("users", { planFilter: "All" }),
+    },
+    {
+      label: "Total Patients",
+      value: (metrics.total_patients ?? 0).toLocaleString(),
+      tag: `${metrics.total_users ? Math.round(((metrics.total_patients ?? 0) / metrics.total_users) * 100) : 0}% of users`,
+      subtext: "Client patient base",
+      icon: UserCheck,
+      color: "text-emerald-600",
+      border: "border-emerald-500",
+      bgIcon: "bg-emerald-50",
+      onClick: () => navigateTo("users", { role: "user" }),
+    },
+    {
+      label: "Total Nutritionists",
+      value: (metrics.total_nutritionists ?? 0).toLocaleString(),
+      tag: `${metrics.inhouse_consultants ?? 0} in-house · ${metrics.expert_consultants ?? 0} expert`,
+      subtext: "Healthcare providers",
+      icon: Stethoscope,
+      color: "text-purple-600",
+      border: "border-purple-500",
+      bgIcon: "bg-purple-50",
+      onClick: () => navigateTo("approvals"),
+    },
+    {
+      label: "Total Revenue",
+      value: `Rs ${(metrics.total_revenue ?? 0).toLocaleString()}`,
+      tag: "Verified payments",
+      subtext: timeRange !== "all" ? `All-time: Rs ${(metrics.all_time?.total_revenue ?? 0).toLocaleString()}` : "Subscription plans",
+      icon: IndianRupee,
+      color: "text-orange-500",
+      border: "border-orange-500",
+      bgIcon: "bg-orange-50",
+      onClick: () => navigateTo("payments"),
+    },
+    {
+      label: "In-House Consultants",
+      value: (metrics.inhouse_consultants ?? 0).toLocaleString(),
+      tag: "Internal team",
+      subtext: "Full-time dietitians",
+      icon: Building2,
+      color: "text-sky-600",
+      border: "border-sky-500",
+      bgIcon: "bg-sky-50",
+      onClick: () => navigateTo("approvals"),
+    },
+    {
+      label: "Expert Consultants",
+      value: (metrics.expert_consultants ?? 0).toLocaleString(),
+      tag: "Specialist network",
+      subtext: "External clinical experts",
+      icon: Award,
+      color: "text-violet-600",
+      border: "border-violet-500",
+      bgIcon: "bg-violet-50",
+      onClick: () => navigateTo("approvals"),
+    },
+    {
+      label: "In-House Consultations",
+      value: (metrics.inhouse_consultations ?? 0).toLocaleString(),
+      tag: `${metrics.total_consultations ? Math.round(((metrics.inhouse_consultations ?? 0) / metrics.total_consultations) * 100) : 0}% of sessions`,
+      subtext: "Delivered by staff",
+      icon: CalendarCheck,
+      color: "text-indigo-600",
+      border: "border-indigo-500",
+      bgIcon: "bg-indigo-50",
+      onClick: () => navigateTo("appointments", { category: "IN_HOUSE" }),
+    },
+    {
+      label: "Expert Consultations",
+      value: (metrics.expert_consultations ?? 0).toLocaleString(),
+      tag: `${metrics.total_consultations ? Math.round(((metrics.expert_consultations ?? 0) / metrics.total_consultations) * 100) : 0}% of sessions`,
+      subtext: "Delivered by specialists",
+      icon: Sparkles,
+      color: "text-pink-600",
+      border: "border-pink-500",
+      bgIcon: "bg-pink-50",
+      onClick: () => navigateTo("appointments", { category: "EXPERT" }),
+    },
   ];
 
   return (
-    <div className="p-6 space-y-6 bg-[#fafafa] min-h-full">
-      {/* Header & Global Filters */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900 tracking-tight">Dashboard Overview</h1>
-          <div className="flex items-center gap-2 mt-1.5 opacity-80">
-            <CalendarIcon size={14} className="text-gray-500" />
-            <span className="text-sm text-gray-600 font-medium">
-              {timeRange === "day" ? new Date(selectedDate).toLocaleDateString("en-US", { weekday: "long", day: "numeric", month: "long", year: "numeric" }) 
-               : timeRange === "month" ? new Date(selectedMonth + "-01").toLocaleDateString("en-US", { month: "long", year: "numeric" })
-               : timeRange === "year" ? selectedYear
-               : timeRange === "all" ? "All Time"
-               : today}
+    <div className="p-4 sm:p-6 lg:p-8 space-y-6 bg-slate-50/60 min-h-full">
+      {/* ================= Header & Global Filter Bar ================= */}
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+        <div className="space-y-1">
+          <div className="flex items-center gap-2.5">
+            <span className="text-[10px] font-black uppercase tracking-widest px-2.5 py-0.5 rounded-md bg-orange-100/80 text-orange-700 border border-orange-200/60">
+              Executive Intelligence
+            </span>
+            <span className="text-xs font-semibold text-slate-500 flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+              Live Pulse
             </span>
           </div>
+          <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
+            Dashboard & Platform Telemetry
+          </h1>
+          <p className="text-xs sm:text-sm text-slate-500 font-medium">
+            {filterLabel} · Real-time user acquisition, verified revenue and clinical operations
+          </p>
         </div>
-        
-        <div className="flex items-center gap-3">
+
+        {/* Dynamic Filters Bar */}
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Quick Filter Pills */}
+          <div className="inline-flex p-1 bg-white border border-slate-200/80 rounded-2xl shadow-xs text-xs font-bold">
+            {[
+              { id: "all", label: "All Time" },
+              { id: "day", label: "Date" },
+              { id: "week", label: "Weekly" },
+              { id: "month", label: "Monthly" },
+              { id: "year", label: "Yearly" },
+            ].map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setTimeRange(tab.id)}
+                className={`px-3 py-1.5 rounded-xl transition-all cursor-pointer ${
+                  timeRange === tab.id
+                    ? "bg-slate-900 text-white shadow-xs font-bold"
+                    : "text-slate-600 hover:text-slate-900 hover:bg-slate-100/60"
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Contextual Date Selectors */}
           {timeRange === "day" && (
-            <input 
-              type="date" 
+            <input
+              type="date"
               value={selectedDate}
               onChange={(e) => setSelectedDate(e.target.value)}
-              className="px-3 py-2 text-sm bg-white border border-gray-200 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-300 transition-all font-medium text-gray-700"
+              className="px-3 py-1.5 text-xs font-bold bg-white border border-slate-200 rounded-xl shadow-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-orange-300"
             />
           )}
+
           {timeRange === "month" && (
-            <input 
-              type="month" 
+            <input
+              type="month"
               value={selectedMonth}
               onChange={(e) => setSelectedMonth(e.target.value)}
-              className="px-3 py-2 text-sm bg-white border border-gray-200 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-300 transition-all font-medium text-gray-700"
+              className="px-3 py-1.5 text-xs font-bold bg-white border border-slate-200 rounded-xl shadow-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-orange-300"
             />
           )}
+
           {timeRange === "year" && (
-            <input 
-              type="number" 
-              min="2020" max="2100"
+            <input
+              type="number"
+              min="2020"
+              max="2035"
               value={selectedYear}
               onChange={(e) => setSelectedYear(e.target.value)}
-              className="px-3 py-2 text-sm bg-white border border-gray-200 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-300 transition-all font-medium text-gray-700 w-24"
+              className="px-3 py-1.5 text-xs font-bold bg-white border border-slate-200 rounded-xl shadow-xs text-slate-700 w-24 focus:outline-none focus:ring-2 focus:ring-orange-300"
             />
           )}
-          <div className="relative">
-            <select 
-              value={timeRange}
-              onChange={(e) => setTimeRange(e.target.value)}
-              className="appearance-none px-4 py-2 text-sm font-semibold text-gray-700 bg-white border border-gray-200 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-300 transition-all cursor-pointer pr-10"
-            >
-              <option value="day">Date</option>
-              <option value="week">Weekly</option>
-              <option value="month">Monthly</option>
-              <option value="year">Yearly</option>
-              <option value="all">All Time</option>
-            </select>
-            <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none" />
-          </div>
+
+          {/* Manual Refresh Button */}
+          <button
+            onClick={() => loadData(true)}
+            disabled={refreshing || loading}
+            title="Refresh statistics"
+            className="p-2 text-slate-600 hover:text-slate-900 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 shadow-xs transition cursor-pointer"
+          >
+            <RefreshCw size={15} className={refreshing ? "animate-spin text-orange-500" : ""} />
+          </button>
         </div>
       </div>
 
       {loading && !data ? (
-        <div className="flex flex-col items-center justify-center h-full py-40">
-          <Loader2 size={40} className="animate-spin text-orange-400 mb-4" />
-          <p className="text-sm font-medium text-gray-500 animate-pulse">Gathering insights...</p>
+        <div className="flex flex-col items-center justify-center py-32 bg-white rounded-2xl border border-gray-100">
+          <Loader2 size={36} className="animate-spin text-orange-500 mb-3" />
+          <p className="text-sm font-semibold text-gray-600">Gathering administrative metrics...</p>
         </div>
       ) : (
         <>
-          {/* Stat cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5">
-            {stats.map((s) => <StatCard key={s.label} {...s} />)}
+          {/* ================= Primary KPI Cards (8 Key Metrics) ================= */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {stats.map((s, idx) => (
+              <StatCard key={s.label} {...s} delay={idx * 50} />
+            ))}
           </div>
 
-          {/* Charts Row 1: Revenue & Growth */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-            {/* Revenue Trend */}
-            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 hover:shadow-md transition-shadow">
-              <div className="flex items-center justify-between mb-6">
+          {/* ================= Row 1: Charts (Growth & Revenue Trends) ================= */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* User & Patient Acquisition Trajectory */}
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-xs p-6 hover:shadow-md transition-shadow">
+              <div className="flex items-center justify-between mb-5">
                 <div>
                   <h3 className="font-bold text-lg text-gray-900 flex items-center gap-2">
-                    <BarChart2 size={18} className="text-orange-500" />
-                    Revenue Trend
+                    <Activity size={18} className="text-blue-600" />
+                    User Acquisition & Growth
                   </h3>
-                  <p className="text-xs font-medium text-gray-400 mt-0.5">Earnings across selected period</p>
+                  <p className="text-xs text-gray-400 font-medium mt-0.5">
+                    Registration trajectory over selected time window
+                  </p>
+                </div>
+                <div className="flex items-center gap-3 text-xs font-semibold">
+                  <span className="flex items-center gap-1.5 text-blue-600">
+                    <span className="w-2.5 h-2.5 rounded-full bg-blue-500" /> Total Users
+                  </span>
+                  <span className="flex items-center gap-1.5 text-emerald-600">
+                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" /> Patients
+                  </span>
                 </div>
               </div>
-              {data?.revenueTrend && data.revenueTrend.length > 0 ? (
+
+              {charts.user_growth && charts.user_growth.length > 0 ? (
                 <ResponsiveContainer width="100%" height={260}>
-                  <AreaChart data={data.revenueTrend} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                  <AreaChart data={charts.user_growth} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                     <defs>
-                      <linearGradient id="colorRev" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#f97316" stopOpacity={0.3}/>
-                        <stop offset="95%" stopColor="#f97316" stopOpacity={0}/>
+                      <linearGradient id="userGrowthGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.25} />
+                        <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
+                      </linearGradient>
+                      <linearGradient id="patientGrowthGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#10b981" stopOpacity={0.25} />
+                        <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
                       </linearGradient>
                     </defs>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
-                    <XAxis dataKey="month" tick={{ fontSize: 12, fill: "#9ca3af", fontWeight: 500 }} axisLine={false} tickLine={false} tickMargin={10} />
-                    <YAxis tick={{ fontSize: 12, fill: "#9ca3af", fontWeight: 500 }} axisLine={false} tickLine={false} tickFormatter={(val) => `${val/1000}k`} />
-                    <Tooltip 
-                      contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)', fontWeight: 600 }}
-                      formatter={(v) => [`Rs ${v.toLocaleString()}`, "Revenue"]} 
-                      cursor={{ stroke: "#fb923c", strokeWidth: 1, strokeDasharray: "4 4" }} 
+                    <XAxis
+                      dataKey="date"
+                      tick={{ fontSize: 11, fill: "#9ca3af", fontWeight: 500 }}
+                      axisLine={false}
+                      tickLine={false}
+                      tickMargin={10}
                     />
-                    <Area type="monotone" dataKey="revenue" stroke="#f97316" strokeWidth={3} fillOpacity={1} fill="url(#colorRev)" activeDot={{ r: 6, fill: "#ea580c", stroke: "#fff", strokeWidth: 2 }} />
+                    <YAxis
+                      tick={{ fontSize: 11, fill: "#9ca3af", fontWeight: 500 }}
+                      axisLine={false}
+                      tickLine={false}
+                    />
+                    <Tooltip
+                      contentStyle={{
+                        borderRadius: "12px",
+                        border: "none",
+                        boxShadow: "0 10px 15px -3px rgb(0 0 0 / 0.1)",
+                        fontWeight: 600,
+                        fontSize: "12px"
+                      }}
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="users"
+                      name="Total Users"
+                      stroke="#3b82f6"
+                      strokeWidth={2.5}
+                      fillOpacity={1}
+                      fill="url(#userGrowthGrad)"
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="patients"
+                      name="Patients"
+                      stroke="#10b981"
+                      strokeWidth={2}
+                      fillOpacity={1}
+                      fill="url(#patientGrowthGrad)"
+                    />
                   </AreaChart>
                 </ResponsiveContainer>
               ) : (
                 <div className="flex flex-col items-center justify-center h-64 text-center">
-                  <BarChart2 size={48} className="text-gray-300 mb-3" />
-                  <p className="text-gray-500 font-semibold">No revenue data available</p>
-                  <p className="text-gray-400 text-sm mt-1">Revenue will appear once users purchase subscription plans</p>
+                  <Activity size={40} className="text-gray-300 mb-2" />
+                  <p className="text-sm font-semibold text-gray-500">No user signups in this filter</p>
+                  <p className="text-xs text-gray-400 mt-1">Switch to All Time or select another period</p>
                 </div>
               )}
             </div>
 
-            {/* User Growth */}
-            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 hover:shadow-md transition-shadow">
-              <div className="flex items-center justify-between mb-6">
-                <div>
-                  <h3 className="font-bold text-lg text-gray-900 flex items-center gap-2">
-                    <Activity size={18} className="text-blue-500" />
-                    User Growth
-                  </h3>
-                  <p className="text-xs font-medium text-gray-400 mt-0.5">Registration trajectory</p>
+            {/* Revenue Analytics & Trend */}
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-xs p-6 hover:shadow-md transition-shadow flex flex-col justify-between">
+              <div>
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <h3 className="font-bold text-lg text-gray-900 flex items-center gap-2">
+                      <BarChart2 size={18} className="text-orange-500" />
+                      Revenue Performance
+                    </h3>
+                    <p className="text-xs text-gray-400 font-medium mt-0.5">
+                      Earnings generated across successful subscriptions
+                    </p>
+                  </div>
+                  <span className="text-base font-extrabold text-orange-600 bg-orange-50 px-3 py-1 rounded-xl">
+                    Rs {(metrics.total_revenue ?? 0).toLocaleString()}
+                  </span>
                 </div>
+
+                {/* Plan Revenue Pills */}
+                {charts.revenue_by_plan && charts.revenue_by_plan.length > 0 && (
+                  <div className="flex flex-wrap gap-2 mb-4">
+                    {charts.revenue_by_plan.slice(0, 4).map((p, idx) => (
+                      <span
+                        key={p.plan_id}
+                        className="text-xs px-2.5 py-1 rounded-lg bg-gray-50 border border-gray-100 font-semibold text-gray-700 flex items-center gap-1.5"
+                      >
+                        <span className="w-2 h-2 rounded-full" style={{ background: PLAN_COLORS[idx % PLAN_COLORS.length] }} />
+                        {p.plan_name}: Rs {p.total_revenue.toLocaleString()}
+                      </span>
+                    ))}
+                  </div>
+                )}
               </div>
-              <ResponsiveContainer width="100%" height={260}>
-                <LineChart data={data?.growthData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
-                  <XAxis dataKey="date" tick={{ fontSize: 12, fill: "#9ca3af", fontWeight: 500 }} axisLine={false} tickLine={false} tickMargin={10} />
-                  <YAxis tick={{ fontSize: 12, fill: "#9ca3af", fontWeight: 500 }} axisLine={false} tickLine={false} />
-                  <Tooltip 
-                    contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)', fontWeight: 600 }}
-                    cursor={{ stroke: "#3b82f6", strokeWidth: 1, strokeDasharray: "4 4" }} 
-                  />
-                  <Line type="monotone" dataKey="users" stroke="#3b82f6" strokeWidth={3} dot={<CustomDot fill="#3b82f6" />} activeDot={{ r: 6, fill: "#1d4ed8" }} animationDuration={1500} />
-                </LineChart>
-              </ResponsiveContainer>
+
+              {charts.revenue_trend && charts.revenue_trend.length > 0 ? (
+                <ResponsiveContainer width="100%" height={210}>
+                  <AreaChart data={charts.revenue_trend} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="revGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#f97316" stopOpacity={0.3} />
+                        <stop offset="95%" stopColor="#f97316" stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
+                    <XAxis
+                      dataKey="date"
+                      tick={{ fontSize: 11, fill: "#9ca3af", fontWeight: 500 }}
+                      axisLine={false}
+                      tickLine={false}
+                      tickMargin={10}
+                    />
+                    <YAxis
+                      tick={{ fontSize: 11, fill: "#9ca3af", fontWeight: 500 }}
+                      axisLine={false}
+                      tickLine={false}
+                      tickFormatter={(v) => `Rs ${v}`}
+                    />
+                    <Tooltip
+                      contentStyle={{
+                        borderRadius: "12px",
+                        border: "none",
+                        boxShadow: "0 10px 15px -3px rgb(0 0 0 / 0.1)",
+                        fontWeight: 600,
+                        fontSize: "12px"
+                      }}
+                      formatter={(val) => [`Rs ${Number(val).toLocaleString()}`, "Revenue"]}
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="revenue"
+                      stroke="#f97316"
+                      strokeWidth={2.5}
+                      fillOpacity={1}
+                      fill="url(#revGrad)"
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="flex flex-col items-center justify-center h-48 text-center">
+                  <IndianRupee size={36} className="text-gray-300 mb-2" />
+                  <p className="text-sm font-semibold text-gray-500">No revenue events in this filter</p>
+                  <p className="text-xs text-gray-400 mt-0.5">Switch filter to view overall financial history</p>
+                </div>
+              )}
             </div>
           </div>
 
-          {/* Row 2: Analytics & Breakdowns */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-            {/* Plan Distribution */}
-            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 hover:shadow-md transition-shadow flex flex-col">
-              <h3 className="font-bold text-lg text-gray-900 mb-1">Plan Distribution</h3>
-              <p className="text-xs font-medium text-gray-400 mb-6">Active subscription split</p>
-              {data?.planDist && data.planDist.length > 0 ? (
-                <>
-                  <div className="flex justify-center flex-1">
-                    <PieChart width={180} height={180}>
-                      <Pie data={data.planDist} cx={90} cy={90} innerRadius={56} outerRadius={86} paddingAngle={4} dataKey="value" stroke="none" animationDuration={1000}>
-                        {data.planDist.map((e) => <Cell key={e.name} fill={e.color} />)}
-                      </Pie>
-                      <Tooltip formatter={(value, name, props) => [`${value} users (${props.payload.pct}%)`, name]} contentStyle={{borderRadius:8, border:"none", boxShadow:"0 4px 6px -1px rgb(0 0 0 / 0.1)"}}/>
-                    </PieChart>
+          {/* ================= Row 2: Breakdowns (Consultations, Plans, Workforce) ================= */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Consultations Breakdown */}
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-xs p-6 hover:shadow-md transition-shadow flex flex-col justify-between">
+              <div>
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <h3 className="font-bold text-lg text-gray-900 flex items-center gap-2">
+                      <CalendarCheck size={18} className="text-indigo-600" />
+                      Consultation Sessions
+                    </h3>
+                    <p className="text-xs text-gray-400 font-medium mt-0.5">
+                      Session distribution & appointment status
+                    </p>
                   </div>
-                  <div className="space-y-3 mt-4">
-                    {data.planDist.map((p) => (
-                      <div key={p.name} className="flex items-center gap-3">
-                        <span className="w-2.5 h-2.5 rounded-full shrink-0 shadow-sm" style={{ background: p.color }} />
-                        <span className="text-sm font-semibold text-gray-700 flex-1">{p.name}</span>
-                        <span className="text-sm font-bold text-gray-900 w-10 text-right">{p.value}</span>
-                        <span className="text-xs font-medium text-gray-400 w-10 text-right bg-gray-50 py-0.5 rounded-md">{p.pct}%</span>
-                      </div>
-                    ))}
-                  </div>
-                </>
-              ) : (
-                <div className="flex flex-col items-center justify-center h-64 text-center">
-                  <PieChartIcon size={48} className="text-gray-300 mb-3" />
-                  <p className="text-gray-500 font-semibold">No subscription data</p>
-                  <p className="text-gray-400 text-sm mt-1">Plan distribution will appear once users purchase plans</p>
+                  <span className="text-xs font-bold px-2.5 py-1 bg-indigo-50 text-indigo-700 rounded-lg">
+                    {metrics.total_consultations ?? 0} Total
+                  </span>
                 </div>
-              )}
-            </div>
 
-            {/* Meals Logged */}
-            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 hover:shadow-md transition-shadow">
-              <h3 className="font-bold text-lg text-gray-900 mb-1">Meals Tracked</h3>
-              <p className="text-xs font-medium text-gray-400 mb-6">Distribution by category</p>
-              <ResponsiveContainer width="100%" height={220}>
-                <BarChart data={data?.mealCats} margin={{ top: 0, right: 0, left: -25, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
-                  <XAxis dataKey="name" tick={{ fontSize: 11, fill: "#9ca3af", fontWeight: 500 }} axisLine={false} tickLine={false} tickMargin={10} />
-                  <YAxis tick={{ fontSize: 11, fill: "#9ca3af", fontWeight: 500 }} axisLine={false} tickLine={false} />
-                  <Tooltip cursor={{fill: '#f3f4f6', opacity: 0.5}} contentStyle={{ borderRadius: 8, border: "none", boxShadow: "0 10px 15px -3px rgb(0 0 0 / 0.1)" }} />
-                  <Bar dataKey="count" radius={[6, 6, 0, 0]} maxBarSize={45} animationDuration={1200}>
-                    {data?.mealCats.map((_, i) => <Cell key={i} fill={MEAL_COLORS[i % MEAL_COLORS.length]} />)}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-
-            {/* Recent Activity */}
-            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 hover:shadow-md transition-shadow flex flex-col">
-              <h3 className="font-bold text-lg text-gray-900 mb-1 flex items-center gap-2"><Clock size={16} className="text-gray-400"/> Activity Feed</h3>
-              <p className="text-xs font-medium text-gray-400 mb-6">Latest system actions</p>
-              <div className="space-y-4 flex-1 overflow-y-auto pr-2 custom-scrollbar">
-                {(data?.activity ?? []).map((a, i) => (
-                  <div key={i} className="flex items-start gap-3 group">
-                    <div className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${a.color} shadow-sm group-hover:scale-110 transition-transform`}>{a.initials}</div>
-                    <div className="flex-1 min-w-0 pt-0.5">
-                      <p className="text-sm font-semibold text-gray-800 truncate">{a.name}</p>
-                      <p className="text-xs font-medium text-gray-500 truncate mt-0.5">{a.action}</p>
+                {/* In-House vs Expert Progress Comparison */}
+                <div className="space-y-4 my-3">
+                  <div>
+                    <div className="flex justify-between text-xs font-bold text-gray-700 mb-1.5">
+                      <span className="flex items-center gap-1.5">
+                        <Building2 size={13} className="text-blue-500" /> In-House Consultations
+                      </span>
+                      <span>
+                        {metrics.inhouse_consultations ?? 0} ({metrics.total_consultations ? Math.round(((metrics.inhouse_consultations ?? 0) / metrics.total_consultations) * 100) : 0}%)
+                      </span>
                     </div>
-                    <span className="text-xs font-bold text-gray-300 pt-1 shrink-0">{a.ago}</span>
+                    <div className="w-full bg-gray-100 h-2 rounded-full overflow-hidden">
+                      <div
+                        className="bg-blue-500 h-full rounded-full transition-all duration-700"
+                        style={{
+                          width: `${metrics.total_consultations ? ((metrics.inhouse_consultations ?? 0) / metrics.total_consultations) * 100 : 0}%`
+                        }}
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="flex justify-between text-xs font-bold text-gray-700 mb-1.5">
+                      <span className="flex items-center gap-1.5">
+                        <Sparkles size={13} className="text-purple-500" /> Expert Consultations
+                      </span>
+                      <span>
+                        {metrics.expert_consultations ?? 0} ({metrics.total_consultations ? Math.round(((metrics.expert_consultations ?? 0) / metrics.total_consultations) * 100) : 0}%)
+                      </span>
+                    </div>
+                    <div className="w-full bg-gray-100 h-2 rounded-full overflow-hidden">
+                      <div
+                        className="bg-purple-500 h-full rounded-full transition-all duration-700"
+                        style={{
+                          width: `${metrics.total_consultations ? ((metrics.expert_consultations ?? 0) / metrics.total_consultations) * 100 : 0}%`
+                        }}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Mode Breakdown (Virtual vs Clinic) */}
+                <div className="grid grid-cols-2 gap-2 mt-4 pt-4 border-t border-gray-100">
+                  <div className="p-2.5 rounded-xl bg-sky-50 border border-sky-100/60">
+                    <p className="text-[11px] font-semibold text-sky-700 flex items-center gap-1">
+                      <Video size={12} /> Virtual Video
+                    </p>
+                    <p className="text-lg font-extrabold text-sky-900 mt-0.5">
+                      {metrics.virtual_consultations ?? 0}
+                    </p>
+                  </div>
+                  <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-100/60">
+                    <p className="text-[11px] font-semibold text-emerald-700 flex items-center gap-1">
+                      <Building2 size={12} /> In-Person Clinic
+                    </p>
+                    <p className="text-lg font-extrabold text-emerald-900 mt-0.5">
+                      {metrics.inperson_consultations ?? 0}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Status footer */}
+              <div className="flex items-center justify-between text-xs font-semibold pt-4 mt-4 border-t border-gray-100 text-gray-500">
+                <span className="flex items-center gap-1 text-green-600">
+                  <CheckCircle2 size={13} /> {metrics.confirmed_consultations ?? 0} Confirmed
+                </span>
+                <span className="flex items-center gap-1 text-amber-600">
+                  <Clock size={13} /> {metrics.pending_consultations ?? 0} Pending
+                </span>
+                <span className="flex items-center gap-1 text-red-500">
+                  <AlertCircle size={13} /> {metrics.cancelled_consultations ?? 0} Cancelled
+                </span>
+              </div>
+            </div>
+
+            {/* Plan Distribution (Donut Chart) */}
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-xs p-6 hover:shadow-md transition-shadow flex flex-col justify-between">
+              <div>
+                <h3 className="font-bold text-lg text-gray-900 flex items-center gap-2">
+                  <PieChartIcon size={18} className="text-orange-500" />
+                  Subscription Distribution
+                </h3>
+                <p className="text-xs text-gray-400 font-medium mt-0.5 mb-4">
+                  User distribution across active subscription tiers
+                </p>
+
+                {charts.plan_distribution && charts.plan_distribution.length > 0 ? (
+                  <>
+                    <div className="flex justify-center my-2">
+                      <PieChart width={190} height={190}>
+                        <Pie
+                          data={charts.plan_distribution}
+                          cx={95}
+                          cy={95}
+                          innerRadius={55}
+                          outerRadius={85}
+                          paddingAngle={3}
+                          dataKey="users"
+                          stroke="none"
+                        >
+                          {charts.plan_distribution.map((entry, idx) => (
+                            <Cell key={entry.plan_id} fill={PLAN_COLORS[idx % PLAN_COLORS.length]} />
+                          ))}
+                        </Pie>
+                        <Tooltip
+                          contentStyle={{
+                            borderRadius: "10px",
+                            border: "none",
+                            boxShadow: "0 10px 15px -3px rgb(0 0 0 / 0.1)",
+                            fontSize: "12px",
+                            fontWeight: 600
+                          }}
+                          formatter={(val, name, props) => [`${val} users (${props.payload.percentage}%)`, props.payload.plan_name]}
+                        />
+                      </PieChart>
+                    </div>
+
+                    <div className="space-y-2 mt-3 max-h-36 overflow-y-auto pr-1">
+                      {charts.plan_distribution.map((p, idx) => (
+                        <div key={p.plan_id} className="flex items-center justify-between text-xs">
+                          <span className="flex items-center gap-2 font-semibold text-gray-700 truncate max-w-[150px]">
+                            <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: PLAN_COLORS[idx % PLAN_COLORS.length] }} />
+                            {p.plan_name}
+                          </span>
+                          <span className="font-extrabold text-gray-900">{p.users} users</span>
+                          <span className="text-gray-400 font-medium">{p.percentage}%</span>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                ) : (
+                  <div className="flex flex-col items-center justify-center h-52 text-center">
+                    <PieChartIcon size={36} className="text-gray-300 mb-2" />
+                    <p className="text-sm font-semibold text-gray-500">No active plans in filter</p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Workforce & Nutritionist Overview */}
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-xs p-6 hover:shadow-md transition-shadow flex flex-col justify-between">
+              <div>
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <h3 className="font-bold text-lg text-gray-900 flex items-center gap-2">
+                      <ShieldCheck size={18} className="text-purple-600" />
+                      Nutritionist Workforce
+                    </h3>
+                    <p className="text-xs text-gray-400 font-medium mt-0.5">
+                      Clinical coverage and provider verification
+                    </p>
+                  </div>
+                  <span className="text-xs font-bold px-2.5 py-1 bg-purple-50 text-purple-700 rounded-lg">
+                    {metrics.total_nutritionists ?? 0} Staff
+                  </span>
+                </div>
+
+                <div className="space-y-3 mt-4">
+                  <div className="p-3.5 rounded-xl bg-gray-50 border border-gray-100 flex items-center justify-between">
+                    <div>
+                      <p className="text-xs font-bold text-gray-800 flex items-center gap-1.5">
+                        <Building2 size={14} className="text-blue-500" /> In-House Nutritionists
+                      </p>
+                      <p className="text-[11px] text-gray-400 font-medium mt-0.5">Full-time internal medical team</p>
+                    </div>
+                    <span className="text-lg font-extrabold text-blue-600">
+                      {metrics.inhouse_consultants ?? 0}
+                    </span>
+                  </div>
+
+                  <div className="p-3.5 rounded-xl bg-gray-50 border border-gray-100 flex items-center justify-between">
+                    <div>
+                      <p className="text-xs font-bold text-gray-800 flex items-center gap-1.5">
+                        <Award size={14} className="text-purple-500" /> Specialist Experts
+                      </p>
+                      <p className="text-[11px] text-gray-400 font-medium mt-0.5">Consultant partner doctors</p>
+                    </div>
+                    <span className="text-lg font-extrabold text-purple-600">
+                      {metrics.expert_consultants ?? 0}
+                    </span>
+                  </div>
+
+                  <div className="p-3.5 rounded-xl bg-emerald-50/70 border border-emerald-100 flex items-center justify-between">
+                    <div>
+                      <p className="text-xs font-bold text-emerald-800 flex items-center gap-1.5">
+                        <CheckCircle2 size={14} className="text-emerald-600" /> Active Patient Coverage
+                      </p>
+                      <p className="text-[11px] text-emerald-600/80 font-medium mt-0.5">Assigned to client care</p>
+                    </div>
+                    <span className="text-lg font-extrabold text-emerald-700">
+                      {metrics.total_patients ?? 0}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <button
+                onClick={() => navigateTo("nutritionists")}
+                className="mt-5 w-full py-2.5 px-4 text-xs font-bold text-purple-700 bg-purple-50 hover:bg-purple-100 rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer"
+              >
+                Manage Nutritionist Team <ArrowRight size={13} />
+              </button>
+            </div>
+          </div>
+
+          {/* ================= Row 3: Live System Activity (Feeds) ================= */}
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-xs p-6 hover:shadow-md transition-shadow">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5 border-b border-gray-100 pb-4">
+              <div>
+                <h3 className="font-bold text-lg text-gray-900 flex items-center gap-2">
+                  <Clock size={18} className="text-orange-500" />
+                  Live Administrative Activity
+                </h3>
+                <p className="text-xs text-gray-400 font-medium mt-0.5">
+                  Recent signups, subscription purchases, and consultation bookings
+                </p>
+              </div>
+
+              {/* Feed Tabs */}
+              <div className="inline-flex p-1 bg-gray-100 rounded-xl text-xs font-semibold">
+                <button
+                  onClick={() => setActiveActivityTab("signups")}
+                  className={`px-3 py-1.5 rounded-lg transition cursor-pointer ${
+                    activeActivityTab === "signups"
+                      ? "bg-white text-gray-900 shadow-xs font-bold"
+                      : "text-gray-500 hover:text-gray-900"
+                  }`}
+                >
+                  Recent Users
+                </button>
+                <button
+                  onClick={() => setActiveActivityTab("payments")}
+                  className={`px-3 py-1.5 rounded-lg transition cursor-pointer ${
+                    activeActivityTab === "payments"
+                      ? "bg-white text-gray-900 shadow-xs font-bold"
+                      : "text-gray-500 hover:text-gray-900"
+                  }`}
+                >
+                  Recent Payments
+                </button>
+                <button
+                  onClick={() => setActiveActivityTab("consultations")}
+                  className={`px-3 py-1.5 rounded-lg transition cursor-pointer ${
+                    activeActivityTab === "consultations"
+                      ? "bg-white text-gray-900 shadow-xs font-bold"
+                      : "text-gray-500 hover:text-gray-900"
+                  }`}
+                >
+                  Recent Consultations
+                </button>
+              </div>
+            </div>
+
+            {/* Tab 1: Recent Signups */}
+            {activeActivityTab === "signups" && (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                {(recentActivity.recent_signups || []).map((u) => {
+                  const isNutri = (u.role || "").toLowerCase() === "nutritionist";
+                  const isAdmin = (u.role || "").toLowerCase() === "admin";
+                  return (
+                    <div
+                      key={u.id}
+                      className="p-3.5 rounded-xl border border-gray-100 bg-gray-50/50 hover:bg-white hover:shadow-xs transition flex items-center justify-between gap-3"
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold text-xs shrink-0 ${
+                          isNutri ? "bg-purple-100 text-purple-700" : isAdmin ? "bg-red-100 text-red-700" : "bg-blue-100 text-blue-700"
+                        }`}>
+                          {(u.full_name || "U").slice(0, 2).toUpperCase()}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-xs font-bold text-gray-900 truncate">{u.full_name}</p>
+                          <p className="text-[11px] text-gray-400 truncate">{u.email}</p>
+                        </div>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${
+                          isNutri ? "bg-purple-50 text-purple-700 border border-purple-200" : "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                        }`}>
+                          {u.role || "user"}
+                        </span>
+                        <p className="text-[10px] text-gray-400 mt-1">{formatTimeAgo(u.date_joined)}</p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Tab 2: Recent Payments */}
+            {activeActivityTab === "payments" && (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                {(recentActivity.recent_payments || []).map((p) => (
+                  <div
+                    key={p.id}
+                    className="p-3.5 rounded-xl border border-gray-100 bg-gray-50/50 hover:bg-white hover:shadow-xs transition flex items-center justify-between gap-3"
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-10 h-10 rounded-xl bg-orange-100 text-orange-600 flex items-center justify-center font-bold text-xs shrink-0">
+                        <IndianRupee size={16} />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-xs font-bold text-gray-900 truncate">{p.user_name}</p>
+                        <p className="text-[11px] text-gray-400 truncate">{p.plan_name}</p>
+                      </div>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <span className="text-xs font-extrabold text-gray-900">
+                        Rs {p.amount}
+                      </span>
+                      <p className="text-[10px] text-gray-400 mt-1">{formatTimeAgo(p.created_at)}</p>
+                    </div>
                   </div>
                 ))}
               </div>
-            </div>
+            )}
+
+            {/* Tab 3: Recent Consultations */}
+            {activeActivityTab === "consultations" && (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                {(recentActivity.recent_consultations || []).map((c) => {
+                  const isExpert = (c.category || "").toUpperCase() === "EXPERT";
+                  return (
+                    <div
+                      key={c.id}
+                      className="p-3.5 rounded-xl border border-gray-100 bg-gray-50/50 hover:bg-white hover:shadow-xs transition flex items-center justify-between gap-3"
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold text-xs shrink-0 ${
+                          isExpert ? "bg-purple-100 text-purple-700" : "bg-blue-100 text-blue-700"
+                        }`}>
+                          {c.type === "VIRTUAL" ? <Video size={16} /> : <Building2 size={16} />}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-xs font-bold text-gray-900 truncate">
+                            {c.patient_name} <span className="text-gray-400 font-normal">with</span> {c.nutritionist_name}
+                          </p>
+                          <p className="text-[11px] text-gray-400 truncate">
+                            {c.slot_date || "Date scheduled"}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${
+                          isExpert ? "bg-purple-50 text-purple-700 border border-purple-200" : "bg-blue-50 text-blue-700 border border-blue-200"
+                        }`}>
+                          {isExpert ? "Expert" : "In-House"}
+                        </span>
+                        <p className="text-[10px] text-gray-400 mt-1">{formatTimeAgo(c.created_at)}</p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </>
       )}
-      
-      {/* Add custom keyframes for animation */}
-      <style dangerouslySetInnerHTML={{__html: `
-        @keyframes fade-in-up {
-          0% { opacity: 0; transform: translateY(15px); }
-          100% { opacity: 1; transform: translateY(0); }
-        }
-        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
-        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: #e5e7eb; border-radius: 4px; }
-        .custom-scrollbar:hover::-webkit-scrollbar-thumb { background: #d1d5db; }
-      `}} />
     </div>
   );
 }
