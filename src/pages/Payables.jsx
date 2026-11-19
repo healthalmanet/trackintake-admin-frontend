@@ -360,8 +360,13 @@ export default function Payables() {
                         <div className="text-[11px] text-gray-400">{item.patient?.email}</div>
                       </td>
 
-                      <td className="px-5 py-4 font-bold text-gray-900">
-                        Rs {item.fee_amount}
+                      <td className="px-5 py-4">
+                        <div className="font-bold text-gray-900">Rs {item.fee_amount}</div>
+                        {item.commission_amount > 0 && (
+                          <div className="text-[10px] text-orange-600 font-bold mt-0.5">
+                            Cut ({item.commission_rate || 5}%): -Rs {item.commission_amount}
+                          </div>
+                        )}
                       </td>
 
                       <td className="px-5 py-4">

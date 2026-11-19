@@ -18,8 +18,20 @@ export const updateInhousePricingSettings = async (payload) => {
   });
   if (!res.ok) {
     const errorData = await res.json().catch(() => ({}));
-    throw new Error(errorData.message || "Failed to save in-house pricing settings");
+    throw new Error(errorData.message || "Failed to save pricing settings");
   }
   return res.json();
 };
 
+export const updatePractitionerPricing = async (practitionerId, payload) => {
+  const res = await fetch(`${BASE}/practitioner/${practitionerId}/`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.message || "Failed to update practitioner pricing");
+  }
+  return res.json();
+};
