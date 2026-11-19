@@ -106,6 +106,7 @@ export default function App() {
             <Navbar
               unreadCount={unreadCount}
               activePage={activePage}
+              notifications={recentNotifications}
               onNotificationClick={() => handleNavigate("notifications")}
               onNavigate={handleNavigate}
               onLogout={handleLogout}

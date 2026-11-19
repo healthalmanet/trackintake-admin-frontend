@@ -16,7 +16,7 @@ const NOTIF_ICONS = {
   "Appointment Failed": AlertCircle,
 };
 
-export default function Navbar({ onLogout, unreadCount = 0, onNotificationClick, onNavigate, onToggleSidebar, activePage }) {
+export default function Navbar({ onLogout, unreadCount = 0, onNotificationClick, onNavigate, onToggleSidebar, activePage, notifications = [] }) {
   const [showDropdown, setShowDropdown] = useState(false);
   const [showNotificationMenu, setShowNotificationMenu] = useState(false);
   const [recentAlerts, setRecentAlerts] = useState([]);
@@ -35,13 +35,27 @@ export default function Navbar({ onLogout, unreadCount = 0, onNotificationClick,
   }, [showNotificationMenu]);
 
   useEffect(() => {
+    if (notifications && notifications.length > 0) {
+      setRecentAlerts(notifications.slice(0, 5));
+    }
+  }, [notifications]);
+
+  useEffect(() => {
     const handleLiveEvent = (e) => {
       const incoming = e.detail;
       if (!incoming) return;
-      setRecentAlerts((prev) => [incoming, ...prev.slice(0, 4)]);
+      if (incoming.notifications) {
+        setRecentAlerts(incoming.notifications.slice(0, 5));
+      } else if (incoming.id || incoming.title) {
+        setRecentAlerts((prev) => [incoming, ...prev.slice(0, 4)]);
+      }
     };
+    window.addEventListener("app:notifications-updated", handleLiveEvent);
     window.addEventListener("trackintake:notification", handleLiveEvent);
-    return () => window.removeEventListener("trackintake:notification", handleLiveEvent);
+    return () => {
+      window.removeEventListener("app:notifications-updated", handleLiveEvent);
+      window.removeEventListener("trackintake:notification", handleLiveEvent);
+    };
   }, []);
 
   const user = (() => {

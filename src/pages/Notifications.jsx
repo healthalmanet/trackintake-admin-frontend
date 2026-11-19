@@ -334,6 +334,17 @@ export default function Notifications({ onUnreadChange }) {
                   <div className="px-3 py-2 border-b border-slate-100 text-[10px] font-extrabold uppercase tracking-wider text-slate-400">
                     Simulate & Test Event Trigger
                   </div>
+
+                  <button
+                    onClick={() => handleSimulate("all")}
+                    className="w-full text-left px-3 py-2 rounded-xl text-xs font-bold text-orange-700 hover:bg-orange-50 bg-orange-50/60 transition flex items-center gap-2.5 cursor-pointer border border-orange-100"
+                  >
+                    <Sparkles size={15} className="text-orange-500" />
+                    <div>
+                      <p>⚡ Generate All Test Events</p>
+                      <span className="text-[10px] font-normal text-slate-400">Triggers all events in 1 API call</span>
+                    </div>
+                  </button>
                   <button
                     onClick={() => handleSimulate("nutritionist_registered")}
                     className="w-full text-left px-3 py-2 rounded-xl text-xs font-bold text-slate-700 hover:bg-emerald-50 hover:text-emerald-700 transition flex items-center gap-2.5 cursor-pointer"
