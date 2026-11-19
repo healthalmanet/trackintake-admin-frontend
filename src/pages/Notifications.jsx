@@ -115,13 +115,16 @@ function NotificationCard({ n, onMarkRead }) {
   const cfg = TYPE_CONFIG[n.type] || TYPE_CONFIG["General"];
   const Icon = cfg.icon;
 
+  const isPatient = (n.title?.toLowerCase().includes("patient") || n.message?.toLowerCase().includes("patient"));
+  const actionPage = n.metadata?.page || (n.type === "Registration" && isPatient ? "users" : cfg.actionPage);
+  const actionLabel = n.metadata?.actionLabel || (n.type === "Registration" && isPatient ? "View Patient" : cfg.actionLabel);
+
   const handleAction = () => {
-    const page = n.metadata?.page || cfg.actionPage;
-    if (page) {
+    if (actionPage) {
       window.dispatchEvent(
         new CustomEvent("app-nav", {
           detail: {
-            page,
+            page: actionPage,
             state: n.metadata || {}
           }
         })
@@ -157,12 +160,12 @@ function NotificationCard({ n, onMarkRead }) {
       </div>
 
       <div className="flex items-center gap-2.5 shrink-0 self-center">
-        {cfg.actionLabel && (
+        {actionLabel && (
           <button
             onClick={handleAction}
             className="hidden sm:inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-[11px] font-bold bg-slate-900 text-white hover:bg-orange-600 transition cursor-pointer shadow-2xs"
           >
-            <span>{cfg.actionLabel}</span>
+            <span>{actionLabel}</span>
             <ExternalLink size={12} />
           </button>
         )}

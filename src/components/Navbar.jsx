@@ -96,7 +96,9 @@ export default function Navbar({ onLogout, unreadCount = 0, onNotificationClick,
   const handleAlertClick = (n) => {
     setShowNotificationMenu(false);
     let targetPage = "notifications";
-    if (n.type === "Registration") targetPage = "approvals";
+    if (n.type === "Registration") {
+      targetPage = (n.title?.toLowerCase().includes("patient") || n.message?.toLowerCase().includes("patient")) ? "users" : "approvals";
+    }
     else if (n.type === "Plan Purchase" || n.type === "Payment Failed") targetPage = "payments";
     else if (n.type?.startsWith("Appointment")) targetPage = "appointments";
     else if (n.type === "Assignment") targetPage = "assignments";
