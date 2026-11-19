@@ -29,3 +29,13 @@ export const triggerNotificationEvent = async (event, data = {}) => {
   if (!res.ok) throw new Error("Failed to trigger event");
   return res.json();
 };
+
+export const syncAndGenerateNotifications = async (generateTest = false) => {
+  const res = await fetch(`${BASE}/admin-notifications/`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ generate_test: generateTest }),
+  });
+  if (!res.ok) throw new Error("Failed to sync notifications");
+  return res.json();
+};

@@ -26,3 +26,25 @@ export const updatePayable = async (id, data) => {
   return res.json();
 };
 
+export const getNutritionistPayablesHistory = async (nutriId) => {
+  const res = await fetch(`${BASE}/nutritionist/${nutriId}/`);
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || "Failed to fetch practitioner payment history");
+  }
+  return res.json();
+};
+
+export const bulkPayableAction = async ({ appointment_ids, action = "PAYOUT", status = "PAID", transaction_ref = "", notes = "" }) => {
+  const res = await fetch(`${BASE}/bulk-action/`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ appointment_ids, action, status, transaction_ref, notes }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || "Failed to process bulk payout/refund");
+  }
+  return res.json();
+};
+

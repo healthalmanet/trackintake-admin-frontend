@@ -1,36 +1,45 @@
 import { useState, useEffect, useCallback } from "react";
 import {
-  Settings as SettingsIcon, IndianRupee, ShieldCheck, CheckCircle2,
-  AlertCircle, RefreshCw, Loader2, Save, Building2, Video, Search,
-  Users, Sparkles, Check, ArrowRight, ExternalLink, HelpCircle
+  Settings as SettingsIcon, Video, Building2, Percent, Users, Sparkles,
+  Search, RefreshCw, Loader2, Save, CheckCircle2, AlertCircle, Edit3,
+  X, Check, ArrowRight, ShieldCheck, ChevronRight
 } from "lucide-react";
 import * as api from "../api/settings";
 
 export default function Settings() {
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
+  const [savingGlobal, setSavingGlobal] = useState(false);
   const [error, setError] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
+  const [activeTab, setActiveTab] = useState("inhouse"); // 'inhouse' | 'expert'
   const [search, setSearch] = useState("");
 
-  // Form State
+  // Global Config Form State
   const [onlinePrice, setOnlinePrice] = useState(499);
   const [offlinePrice, setOfflinePrice] = useState(499);
+  const [inhouseCommission, setInhouseCommission] = useState(5);
+  const [expertCommission, setExpertCommission] = useState(5);
   const [autoApply, setAutoApply] = useState(true);
   const [applyImmediately, setApplyImmediately] = useState(true);
 
-  // Response State
+  // Response Data
   const [config, setConfig] = useState(null);
   const [metrics, setMetrics] = useState({
     total_inhouse: 0,
     total_experts: 0,
-    matching_online: 0,
-    matching_offline: 0,
-    fully_compliant: 0,
-    non_compliant: 0,
     compliance_percentage: 100,
   });
-  const [practitioners, setPractitioners] = useState([]);
+  const [inhousePractitioners, setInhousePractitioners] = useState([]);
+  const [expertPractitioners, setExpertPractitioners] = useState([]);
+
+  // Edit Practitioner Modal State
+  const [editingPractitioner, setEditingPractitioner] = useState(null);
+  const [editOnlinePrice, setEditOnlinePrice] = useState("");
+  const [editOfflinePrice, setEditOfflinePrice] = useState("");
+  const [isCustomCommission, setIsCustomCommission] = useState(false);
+  const [editCustomCommission, setEditCustomCommission] = useState("");
+  const [savingPractitioner, setSavingPractitioner] = useState(false);
+  const [modalError, setModalError] = useState("");
 
   // Fetch Settings Data
   const loadData = useCallback(async (searchTerm = search) => {
@@ -41,9 +50,12 @@ export default function Settings() {
         setConfig(res.config);
         setOnlinePrice(res.config.online_price);
         setOfflinePrice(res.config.offline_price);
+        setInhouseCommission(res.config.platform_commission_percent ?? 5);
+        setExpertCommission(res.config.expert_commission_percent ?? 5);
         setAutoApply(res.config.auto_apply_to_all);
         setMetrics(res.metrics || {});
-        setPractitioners(res.practitioners || []);
+        setInhousePractitioners(res.inhouse_practitioners || []);
+        setExpertPractitioners(res.expert_practitioners || []);
       }
     } catch (err) {
       setError(err.message || "Failed to load platform settings.");
@@ -61,19 +73,19 @@ export default function Settings() {
     loadData(search);
   };
 
-  const handleSave = async (e) => {
+  // Save In-House Settings
+  const handleSaveInhouse = async (e) => {
     e.preventDefault();
     if (onlinePrice < 0 || offlinePrice < 0) {
       setError("Consultation rates cannot be negative.");
       return;
     }
-
-    const confirmMsg = `Are you sure you want to set global In-House rates to:\n• Online: ₹${onlinePrice}\n• In-Clinic: ₹${offlinePrice}\n\nThis will synchronize ${metrics.total_inhouse || 22} in-house clinicians.`;
-    if (!window.confirm(confirmMsg)) {
+    if (inhouseCommission < 0 || inhouseCommission > 100) {
+      setError("In-house commission cut must be between 0% and 100%.");
       return;
     }
 
-    setSaving(true);
+    setSavingGlobal(true);
     setError("");
     setSuccessMsg("");
 
@@ -81,419 +93,730 @@ export default function Settings() {
       const res = await api.updateInhousePricingSettings({
         online_price: parseFloat(onlinePrice),
         offline_price: parseFloat(offlinePrice),
+        platform_commission_percent: parseFloat(inhouseCommission),
+        expert_commission_percent: parseFloat(expertCommission),
         auto_apply_to_all: autoApply,
         apply_to_existing: applyImmediately,
       });
 
       if (res.status === "success") {
-        setSuccessMsg(res.message || "Global in-house consultation prices updated successfully!");
+        setSuccessMsg(res.message || "In-house pricing and commission updated successfully!");
         await loadData();
       }
     } catch (err) {
       setError(err.message || "Failed to update pricing settings.");
     } finally {
-      setSaving(false);
+      setSavingGlobal(false);
     }
   };
 
-  const hasChanges = config && (
-    Number(onlinePrice) !== Number(config.online_price) ||
-    Number(offlinePrice) !== Number(config.offline_price) ||
-    Boolean(autoApply) !== Boolean(config.auto_apply_to_all)
-  );
+  // Save Expert Settings
+  const handleSaveExpert = async (e) => {
+    e.preventDefault();
+    if (expertCommission < 0 || expertCommission > 100) {
+      setError("Expert commission cut must be between 0% and 100%.");
+      return;
+    }
+
+    setSavingGlobal(true);
+    setError("");
+    setSuccessMsg("");
+
+    try {
+      const res = await api.updateInhousePricingSettings({
+        online_price: parseFloat(onlinePrice),
+        offline_price: parseFloat(offlinePrice),
+        platform_commission_percent: parseFloat(inhouseCommission),
+        expert_commission_percent: parseFloat(expertCommission),
+        auto_apply_to_all: autoApply,
+        apply_to_existing: false, // Don't overwrite expert custom rates
+      });
+
+      if (res.status === "success") {
+        setSuccessMsg(res.message || "Expert specialist platform commission updated successfully!");
+        await loadData();
+      }
+    } catch (err) {
+      setError(err.message || "Failed to update expert settings.");
+    } finally {
+      setSavingGlobal(false);
+    }
+  };
+
+  // Open Edit Practitioner Modal
+  const openEditModal = (practitioner) => {
+    setEditingPractitioner(practitioner);
+    setEditOnlinePrice(practitioner.online_price);
+    setEditOfflinePrice(practitioner.offline_price);
+    if (practitioner.custom_commission_percent !== null && practitioner.custom_commission_percent !== undefined) {
+      setIsCustomCommission(true);
+      setEditCustomCommission(practitioner.custom_commission_percent);
+    } else {
+      setIsCustomCommission(false);
+      const defaultRate = practitioner.nutritionist_type === "expert" ? expertCommission : inhouseCommission;
+      setEditCustomCommission(defaultRate);
+    }
+    setModalError("");
+  };
+
+  // Save Individual Practitioner Changes
+  const handleSavePractitioner = async (e) => {
+    e.preventDefault();
+    if (!editingPractitioner) return;
+
+    if (Number(editOnlinePrice) < 0 || Number(editOfflinePrice) < 0) {
+      setModalError("Pricing rates cannot be negative.");
+      return;
+    }
+
+    if (isCustomCommission && (Number(editCustomCommission) < 0 || Number(editCustomCommission) > 100)) {
+      setModalError("Custom commission percentage must be between 0% and 100%.");
+      return;
+    }
+
+    setSavingPractitioner(true);
+    setModalError("");
+
+    try {
+      await api.updatePractitionerPricing(editingPractitioner.id, {
+        online_price: parseFloat(editOnlinePrice),
+        offline_price: parseFloat(editOfflinePrice),
+        use_default_commission: !isCustomCommission,
+        custom_commission_percent: isCustomCommission ? parseFloat(editCustomCommission) : null,
+      });
+
+      setSuccessMsg(`Successfully updated pricing and commission for ${editingPractitioner.full_name}!`);
+      setEditingPractitioner(null);
+      await loadData();
+    } catch (err) {
+      setModalError(err.message || "Failed to update practitioner.");
+    } finally {
+      setSavingPractitioner(false);
+    }
+  };
+
+  const currentPractitioners = activeTab === "inhouse" ? inhousePractitioners : expertPractitioners;
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-7xl mx-auto">
-      {/* Executive Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-3xl border border-slate-200/80 shadow-2xs">
-        <div className="space-y-1">
-          <div className="flex items-center gap-2.5">
-            <div className="w-10 h-10 rounded-2xl bg-orange-50 text-orange-600 flex items-center justify-center font-black shadow-xs">
-              <SettingsIcon size={20} />
-            </div>
-            <div>
-              <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
-                Global System Settings
-              </h1>
-              <p className="text-xs sm:text-sm text-slate-500 font-medium">
-                Enforce standardized in-house clinician consultation rates, compliance rules, and platform defaults
-              </p>
-            </div>
+    <div className="p-4 sm:p-6 lg:p-7 space-y-5 max-w-7xl mx-auto font-sans">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-5 rounded-2xl border border-slate-200 shadow-2xs">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-orange-50 text-orange-600 flex items-center justify-center font-black shrink-0">
+            <SettingsIcon size={20} />
+          </div>
+          <div>
+            <h1 className="text-lg sm:text-xl font-black text-slate-900 tracking-tight">
+              Consultation Rates & Platform Commission
+            </h1>
+            <p className="text-xs text-slate-500 font-medium">
+              Configure standardized in-house pricing, expert commission cuts, and practitioner overrides
+            </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-2 self-start md:self-center">
-          <button
-            onClick={() => loadData()}
-            disabled={loading}
-            className="inline-flex items-center gap-2 px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs sm:text-sm font-bold transition cursor-pointer"
-          >
-            <RefreshCw size={15} className={loading ? "animate-spin" : ""} />
-            Refresh
-          </button>
-        </div>
+        <button
+          onClick={() => loadData()}
+          disabled={loading}
+          className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition cursor-pointer self-start sm:self-center"
+        >
+          <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
+          Refresh
+        </button>
       </div>
 
       {/* Notifications */}
       {error && (
-        <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 text-sm font-bold flex items-center gap-3 animate-in fade-in">
-          <AlertCircle size={18} className="shrink-0 text-rose-600" />
+        <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-bold flex items-center gap-2.5 animate-in fade-in">
+          <AlertCircle size={16} className="shrink-0 text-rose-600" />
           <span>{error}</span>
         </div>
       )}
 
       {successMsg && (
-        <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-sm font-bold flex items-center gap-3 animate-in fade-in">
-          <CheckCircle2 size={18} className="shrink-0 text-emerald-600" />
-          <span>{successMsg}</span>
+        <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold flex items-center justify-between gap-2.5 animate-in fade-in">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 size={16} className="shrink-0 text-emerald-600" />
+            <span>{successMsg}</span>
+          </div>
+          <button onClick={() => setSuccessMsg("")} className="text-emerald-700 hover:text-emerald-900 cursor-pointer">
+            <X size={14} />
+          </button>
         </div>
       )}
 
-      {/* Key Metric Strip */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Metric 1 */}
-        <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-2xs space-y-2">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Fixed Online Rate</span>
-            <span className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
-              <Video size={16} />
-            </span>
-          </div>
-          <div className="text-2xl sm:text-3xl font-black text-slate-900">
-            ₹{config?.online_price ?? 499}
-          </div>
-          <span className="text-xs text-slate-500 font-medium block">
-            Telehealth session benchmark
+      {/* 2 Tabs Navigation */}
+      <div className="flex items-center gap-2 border-b border-slate-200 pb-2">
+        <button
+          type="button"
+          onClick={() => setActiveTab("inhouse")}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-black transition cursor-pointer ${
+            activeTab === "inhouse"
+              ? "bg-orange-500 text-white shadow-xs"
+              : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"
+          }`}
+        >
+          <Building2 size={16} />
+          In-House Nutritionists
+          <span className={`px-2 py-0.5 rounded-full text-[11px] font-bold ${
+            activeTab === "inhouse" ? "bg-white/20 text-white" : "bg-slate-100 text-slate-600"
+          }`}>
+            {metrics.total_inhouse || inhousePractitioners.length}
           </span>
-        </div>
+        </button>
 
-        {/* Metric 2 */}
-        <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-2xs space-y-2">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Fixed In-Clinic Rate</span>
-            <span className="w-8 h-8 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center">
-              <Building2 size={16} />
-            </span>
-          </div>
-          <div className="text-2xl sm:text-3xl font-black text-slate-900">
-            ₹{config?.offline_price ?? 499}
-          </div>
-          <span className="text-xs text-slate-500 font-medium block">
-            Physical consultation standard
+        <button
+          type="button"
+          onClick={() => setActiveTab("expert")}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-black transition cursor-pointer ${
+            activeTab === "expert"
+              ? "bg-orange-500 text-white shadow-xs"
+              : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"
+          }`}
+        >
+          <Sparkles size={16} />
+          Expert Specialists
+          <span className={`px-2 py-0.5 rounded-full text-[11px] font-bold ${
+            activeTab === "expert" ? "bg-white/20 text-white" : "bg-slate-100 text-slate-600"
+          }`}>
+            {metrics.total_experts || expertPractitioners.length}
           </span>
-        </div>
-
-        {/* Metric 3 */}
-        <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-2xs space-y-2">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">In-House Staff Count</span>
-            <span className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
-              <Users size={16} />
-            </span>
-          </div>
-          <div className="text-2xl sm:text-3xl font-black text-emerald-600">
-            {metrics.total_inhouse} Clinicians
-          </div>
-          <div className="flex items-center gap-1.5 text-xs text-emerald-700 font-bold">
-            <CheckCircle2 size={13} />
-            <span>{metrics.compliance_percentage}% Rate Aligned</span>
-          </div>
-        </div>
-
-        {/* Metric 4 */}
-        <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-2xs space-y-2">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Independent Specialists</span>
-            <span className="w-8 h-8 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
-              <Sparkles size={16} />
-            </span>
-          </div>
-          <div className="text-2xl sm:text-3xl font-black text-slate-900">
-            {metrics.total_experts} Specialists
-          </div>
-          <span className="text-xs text-slate-400 font-medium block">
-            Exempt · Custom rate autonomy
-          </span>
-        </div>
+        </button>
       </div>
 
-      {/* Main Settings Form Card */}
-      <div className="bg-white rounded-3xl border border-slate-200/80 shadow-2xs overflow-hidden">
-        <div className="p-6 sm:p-8 border-b border-slate-100 bg-gradient-to-r from-orange-50/70 via-slate-50/40 to-white">
-          <div className="flex items-center justify-between">
-            <div className="space-y-1">
-              <span className="text-xs font-extrabold uppercase px-3 py-1 rounded-full bg-orange-100 text-orange-700">
-                Core Pricing Policy
+      {/* TAB 1: IN-HOUSE NUTRITIONISTS */}
+      {activeTab === "inhouse" && (
+        <div className="space-y-5">
+          {/* Compact In-House Settings Card */}
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xs overflow-hidden">
+            <div className="p-4 sm:p-5 border-b border-slate-100 bg-slate-50/70 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <span className="text-[11px] font-extrabold uppercase px-2.5 py-0.5 rounded-full bg-orange-100 text-orange-700">
+                  Global In-House Policy
+                </span>
+                <h2 className="text-base font-black text-slate-900 mt-1">
+                  Fixed Consultation Rates & Commission Fee Cut
+                </h2>
+              </div>
+              <span className="text-xs text-slate-500 font-medium">
+                Standardizes pricing across all {metrics.total_inhouse || inhousePractitioners.length} in-house clinicians
               </span>
-              <h2 className="text-xl sm:text-2xl font-black text-slate-900 mt-1">
-                Globally Fixed In-House Consultant Rates
-              </h2>
-              <p className="text-xs sm:text-sm text-slate-500 font-medium">
-                TrackIntake platform policy requires all internal In-House nutritionists to adhere to uniform pricing. Independent Expert Specialists manage separate, individualized rates.
-              </p>
             </div>
+
+            <form onSubmit={handleSaveInhouse} className="p-4 sm:p-5 space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                {/* Online Rate */}
+                <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-1.5">
+                  <span className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                    <Video size={14} className="text-blue-600" />
+                    Fixed Online Rate (₹)
+                  </span>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-sm">₹</span>
+                    <input
+                      type="number"
+                      step="1"
+                      min="0"
+                      value={onlinePrice}
+                      onChange={(e) => setOnlinePrice(e.target.value)}
+                      required
+                      className="w-full pl-7 pr-3 py-1.5 bg-white border border-slate-200 rounded-lg text-base font-black text-slate-900 focus:outline-none focus:ring-2 focus:ring-orange-400/20 focus:border-orange-500"
+                    />
+                  </div>
+                  <span className="text-[11px] text-slate-400 font-medium block">Standard virtual video session</span>
+                </div>
+
+                {/* In-Clinic Rate */}
+                <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-1.5">
+                  <span className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                    <Building2 size={14} className="text-purple-600" />
+                    Fixed In-Clinic Rate (₹)
+                  </span>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-sm">₹</span>
+                    <input
+                      type="number"
+                      step="1"
+                      min="0"
+                      value={offlinePrice}
+                      onChange={(e) => setOfflinePrice(e.target.value)}
+                      required
+                      className="w-full pl-7 pr-3 py-1.5 bg-white border border-slate-200 rounded-lg text-base font-black text-slate-900 focus:outline-none focus:ring-2 focus:ring-orange-400/20 focus:border-orange-500"
+                    />
+                  </div>
+                  <span className="text-[11px] text-slate-400 font-medium block">Physical clinic appointment</span>
+                </div>
+
+                {/* Platform Commission Cut */}
+                <div className="p-3.5 rounded-xl bg-orange-50/60 border border-orange-200 space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-orange-950 flex items-center gap-1.5">
+                      <Percent size={14} className="text-orange-600" />
+                      In-House Commission Cut (%)
+                    </span>
+                    <span className="text-[11px] font-black text-orange-600">{inhouseCommission}%</span>
+                  </div>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      step="0.1"
+                      min="0"
+                      max="100"
+                      value={inhouseCommission}
+                      onChange={(e) => setInhouseCommission(e.target.value)}
+                      required
+                      className="w-full pr-7 pl-3 py-1.5 bg-white border border-orange-300 rounded-lg text-base font-black text-slate-900 focus:outline-none focus:ring-2 focus:ring-orange-400/20 focus:border-orange-500"
+                    />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-sm">%</span>
+                  </div>
+                  <div className="flex gap-1 pt-1">
+                    {[0, 5, 10, 15, 20].map((rate) => (
+                      <button
+                        key={rate}
+                        type="button"
+                        onClick={() => setInhouseCommission(rate)}
+                        className={`px-1.5 py-0.5 rounded text-[10px] font-bold transition cursor-pointer ${
+                          Number(inhouseCommission) === rate
+                            ? "bg-orange-600 text-white"
+                            : "bg-white border border-slate-200 text-slate-600 hover:text-orange-600"
+                        }`}
+                      >
+                        {rate}%
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Compact Simulation + Options */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2 border-t border-slate-100">
+                <div className="flex items-center gap-4 text-xs font-medium text-slate-600">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-slate-400">On ₹1,000 session:</span>
+                    <span className="font-bold text-orange-600">TrackIntake ₹{((1000 * Number(inhouseCommission || 0)) / 100).toFixed(0)}</span>
+                    <span className="text-slate-300">|</span>
+                    <span className="font-bold text-emerald-600">Payout ₹{(1000 - (1000 * Number(inhouseCommission || 0)) / 100).toFixed(0)}</span>
+                  </div>
+
+                  <label className="hidden md:flex items-center gap-1.5 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={applyImmediately}
+                      onChange={(e) => setApplyImmediately(e.target.checked)}
+                      className="w-3.5 h-3.5 text-orange-500 rounded focus:ring-orange-400 cursor-pointer"
+                    />
+                    <span className="text-[11px] text-slate-500">Sync all existing clinicians</span>
+                  </label>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={savingGlobal}
+                  className="inline-flex items-center justify-center gap-1.5 px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold rounded-xl transition cursor-pointer shadow-xs disabled:opacity-50 self-end sm:self-auto"
+                >
+                  {savingGlobal ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+                  Save In-House Policy
+                </button>
+              </div>
+            </form>
           </div>
+
+          {/* In-House Clinicians Directory */}
+          <PractitionerTable
+            title="In-House Clinicians Directory"
+            subtitle="View session rates and platform fee cuts. Click 'Edit' on any clinician to customize individual pricing or commission."
+            practitioners={inhousePractitioners}
+            search={search}
+            setSearch={setSearch}
+            handleSearchSubmit={handleSearchSubmit}
+            onEdit={openEditModal}
+            defaultCommission={inhouseCommission}
+          />
         </div>
+      )}
 
-        <form onSubmit={handleSave} className="p-6 sm:p-8 space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Online Price Input Box */}
-            <div className="p-6 rounded-2xl bg-slate-50/80 border border-slate-200/80 space-y-4 hover:border-blue-300 transition">
-              <div className="flex items-center justify-between">
-                <span className="font-bold text-slate-900 text-sm sm:text-base flex items-center gap-2">
-                  <Video size={18} className="text-blue-600" />
-                  Standard Online Consultation Rate
-                </span>
-                <span className="text-xs font-black uppercase px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-700">
-                  Telehealth
-                </span>
-              </div>
-              <p className="text-xs text-slate-500 leading-relaxed font-medium">
-                Fixed session fee charged to patients for virtual video / audio consultations booked with any In-House practitioner.
-              </p>
-
+      {/* TAB 2: EXPERT NUTRITIONISTS */}
+      {activeTab === "expert" && (
+        <div className="space-y-5">
+          {/* Compact Expert Settings Card */}
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xs overflow-hidden">
+            <div className="p-4 sm:p-5 border-b border-slate-100 bg-slate-50/70 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
-                <label className="block text-xs font-bold text-slate-600 uppercase tracking-wide mb-1.5">
-                  Rate in INR (₹)
-                </label>
-                <div className="relative">
-                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-black text-lg">
-                    ₹
-                  </span>
-                  <input
-                    type="number"
-                    step="1"
-                    min="0"
-                    value={onlinePrice}
-                    onChange={(e) => setOnlinePrice(e.target.value)}
-                    required
-                    className="w-full pl-9 pr-4 py-3 bg-white border border-slate-200 rounded-xl text-lg sm:text-xl font-black text-slate-900 focus:outline-none focus:ring-2 focus:ring-orange-400/20 focus:border-orange-500"
-                    placeholder="499"
-                  />
+                <span className="text-[11px] font-extrabold uppercase px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-700">
+                  Global Expert Specialists Policy
+                </span>
+                <h2 className="text-base font-black text-slate-900 mt-1">
+                  Expert Specialists Platform Commission Fee Cut
+                </h2>
+              </div>
+              <span className="text-xs text-slate-500 font-medium">
+                Standard platform commission applied to independent specialist bookings
+              </span>
+            </div>
+
+            <form onSubmit={handleSaveExpert} className="p-4 sm:p-5 space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* Expert Platform Commission Setting */}
+                <div className="p-3.5 rounded-xl bg-amber-50/50 border border-amber-200 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-amber-950 flex items-center gap-1.5">
+                      <Percent size={14} className="text-amber-600" />
+                      Expert Platform Commission Cut (%)
+                    </span>
+                    <span className="text-xs font-black text-amber-600">{expertCommission}%</span>
+                  </div>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      step="0.1"
+                      min="0"
+                      max="100"
+                      value={expertCommission}
+                      onChange={(e) => setExpertCommission(e.target.value)}
+                      required
+                      className="w-full pr-7 pl-3 py-1.5 bg-white border border-amber-300 rounded-lg text-base font-black text-slate-900 focus:outline-none focus:ring-2 focus:ring-orange-400/20 focus:border-orange-500"
+                    />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-sm">%</span>
+                  </div>
+                  <div className="flex gap-1.5 pt-1">
+                    {[0, 5, 10, 15, 20].map((rate) => (
+                      <button
+                        key={rate}
+                        type="button"
+                        onClick={() => setExpertCommission(rate)}
+                        className={`px-2 py-0.5 rounded text-[11px] font-bold transition cursor-pointer ${
+                          Number(expertCommission) === rate
+                            ? "bg-amber-600 text-white"
+                            : "bg-white border border-slate-200 text-slate-600 hover:text-amber-600"
+                        }`}
+                      >
+                        {rate}%
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Info & Simulation */}
+                <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 flex flex-col justify-between space-y-2">
+                  <div>
+                    <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">
+                      Autonomous Pricing with Platform Commission
+                    </span>
+                    <p className="text-xs text-slate-600 mt-1">
+                      Expert specialists set their own appointment rates. TrackIntake deducts <strong>{expertCommission}%</strong> from online bookings. You can also customize rates or commission for any specific expert below.
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2 pt-1 border-t border-slate-200 text-xs">
+                    <span className="text-slate-400">On ₹1,000 session:</span>
+                    <span className="font-bold text-amber-700">TrackIntake ₹{((1000 * Number(expertCommission || 0)) / 100).toFixed(0)}</span>
+                    <span className="text-slate-300">|</span>
+                    <span className="font-bold text-emerald-700">Expert ₹{(1000 - (1000 * Number(expertCommission || 0)) / 100).toFixed(0)}</span>
+                  </div>
                 </div>
               </div>
-            </div>
 
-            {/* Offline Price Input Box */}
-            <div className="p-6 rounded-2xl bg-slate-50/80 border border-slate-200/80 space-y-4 hover:border-purple-300 transition">
-              <div className="flex items-center justify-between">
-                <span className="font-bold text-slate-900 text-sm sm:text-base flex items-center gap-2">
-                  <Building2 size={18} className="text-purple-600" />
-                  Standard In-Clinic Consultation Rate
-                </span>
-                <span className="text-xs font-black uppercase px-2.5 py-0.5 rounded-full bg-purple-100 text-purple-700">
-                  In-Person
-                </span>
+              <div className="flex justify-end pt-2 border-t border-slate-100">
+                <button
+                  type="submit"
+                  disabled={savingGlobal}
+                  className="inline-flex items-center justify-center gap-1.5 px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold rounded-xl transition cursor-pointer shadow-xs disabled:opacity-50"
+                >
+                  {savingGlobal ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+                  Save Expert Commission Policy
+                </button>
               </div>
-              <p className="text-xs text-slate-500 leading-relaxed font-medium">
-                Fixed session fee charged to patients for in-clinic physical appointments booked with any In-House practitioner at hospital locations.
-              </p>
+            </form>
+          </div>
 
-              <div>
-                <label className="block text-xs font-bold text-slate-600 uppercase tracking-wide mb-1.5">
-                  Rate in INR (₹)
-                </label>
-                <div className="relative">
-                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-black text-lg">
-                    ₹
-                  </span>
-                  <input
-                    type="number"
-                    step="1"
-                    min="0"
-                    value={offlinePrice}
-                    onChange={(e) => setOfflinePrice(e.target.value)}
-                    required
-                    className="w-full pl-9 pr-4 py-3 bg-white border border-slate-200 rounded-xl text-lg sm:text-xl font-black text-slate-900 focus:outline-none focus:ring-2 focus:ring-orange-400/20 focus:border-orange-500"
-                    placeholder="499"
-                  />
+          {/* Expert Specialists Directory */}
+          <PractitionerTable
+            title="Expert Specialists Directory"
+            subtitle="Independent specialists with autonomous rates. Click 'Edit' on any specialist to customize their appointment pricing or commission."
+            practitioners={expertPractitioners}
+            search={search}
+            setSearch={setSearch}
+            handleSearchSubmit={handleSearchSubmit}
+            onEdit={openEditModal}
+            defaultCommission={expertCommission}
+          />
+        </div>
+      )}
+
+      {/* EDIT PRACTITIONER MODAL */}
+      {editingPractitioner && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs animate-in fade-in">
+          <div className="bg-white w-full max-w-lg rounded-2xl border border-slate-200 shadow-2xl overflow-hidden animate-in zoom-in-95">
+            <div className="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-orange-100 text-orange-700 font-black text-xs flex items-center justify-center">
+                  {(editingPractitioner.full_name || "N").slice(0, 2).toUpperCase()}
+                </div>
+                <div>
+                  <h3 className="text-sm sm:text-base font-black text-slate-900 flex items-center gap-2">
+                    {editingPractitioner.full_name}
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                      editingPractitioner.nutritionist_type === "expert"
+                        ? "bg-amber-100 text-amber-800"
+                        : "bg-blue-100 text-blue-800"
+                    }`}>
+                      {editingPractitioner.nutritionist_type === "expert" ? "Expert Specialist" : "In-House"}
+                    </span>
+                  </h3>
+                  <span className="text-xs text-slate-500">{editingPractitioner.email}</span>
                 </div>
               </div>
-            </div>
-          </div>
-
-          {/* Automation & Policy Checkboxes */}
-          <div className="bg-slate-50/80 p-5 rounded-2xl border border-slate-200/80 space-y-3">
-            <label className="flex items-start gap-3 cursor-pointer select-none">
-              <input
-                type="checkbox"
-                checked={autoApply}
-                onChange={(e) => setAutoApply(e.target.checked)}
-                className="w-4 h-4 mt-1 text-orange-500 rounded focus:ring-orange-400 cursor-pointer"
-              />
-              <div>
-                <span className="text-sm font-bold text-slate-900 block">
-                  Enforce on All Future In-House Practitioner Onboardings
-                </span>
-                <span className="text-xs text-slate-500">
-                  Automatically set online and in-clinic consultation prices to these fixed values when new in-house nutritionists register or are approved.
-                </span>
-              </div>
-            </label>
-
-            <label className="flex items-start gap-3 cursor-pointer select-none pt-2 border-t border-slate-200/60">
-              <input
-                type="checkbox"
-                checked={applyImmediately}
-                onChange={(e) => setApplyImmediately(e.target.checked)}
-                className="w-4 h-4 mt-1 text-orange-500 rounded focus:ring-orange-400 cursor-pointer"
-              />
-              <div>
-                <span className="text-sm font-bold text-slate-900 block">
-                  Bulk Synchronize Existing {metrics.total_inhouse || 22} In-House Clinicians
-                </span>
-                <span className="text-xs text-slate-500">
-                  Immediately update all existing active in-house nutritionist database profiles so no practitioner deviates from this pricing standard.
-                </span>
-              </div>
-            </label>
-          </div>
-
-          {/* Form Actions Footer */}
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pt-2">
-            <div className="text-xs text-slate-500 font-medium">
-              Last saved: <strong className="text-slate-800">{config?.updated_at ? new Date(config.updated_at).toLocaleString() : "Never"}</strong>
-            </div>
-
-            <div className="flex items-center gap-3 w-full sm:w-auto">
               <button
                 type="button"
-                onClick={() => {
-                  if (config) {
-                    setOnlinePrice(config.online_price);
-                    setOfflinePrice(config.offline_price);
-                    setAutoApply(config.auto_apply_to_all);
-                  }
-                }}
-                disabled={!hasChanges || saving}
-                className="px-5 py-2.5 text-xs sm:text-sm font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl transition cursor-pointer disabled:opacity-40"
+                onClick={() => setEditingPractitioner(null)}
+                className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-200/60 transition cursor-pointer"
               >
-                Reset Changes
-              </button>
-
-              <button
-                type="submit"
-                disabled={saving}
-                className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-6 py-2.5 bg-orange-500 hover:bg-orange-600 text-white text-xs sm:text-sm font-bold rounded-xl transition cursor-pointer shadow-md shadow-orange-500/20 disabled:opacity-50"
-              >
-                {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
-                Save & Enforce Global Rates
+                <X size={18} />
               </button>
             </div>
+
+            {modalError && (
+              <div className="mx-5 mt-4 p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-bold flex items-center gap-2">
+                <AlertCircle size={14} className="shrink-0 text-rose-600" />
+                <span>{modalError}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleSavePractitioner} className="p-4 sm:p-5 space-y-4">
+              {/* Pricing Rates */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-700 flex items-center gap-1">
+                    <Video size={13} className="text-blue-600" /> Online Price (₹)
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-xs">₹</span>
+                    <input
+                      type="number"
+                      step="1"
+                      min="0"
+                      value={editOnlinePrice}
+                      onChange={(e) => setEditOnlinePrice(e.target.value)}
+                      required
+                      className="w-full pl-6 pr-3 py-1.5 text-sm font-bold bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400/20 focus:border-orange-500"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-700 flex items-center gap-1">
+                    <Building2 size={13} className="text-purple-600" /> In-Clinic Price (₹)
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-xs">₹</span>
+                    <input
+                      type="number"
+                      step="1"
+                      min="0"
+                      value={editOfflinePrice}
+                      onChange={(e) => setEditOfflinePrice(e.target.value)}
+                      required
+                      className="w-full pl-6 pr-3 py-1.5 text-sm font-bold bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400/20 focus:border-orange-500"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Commission Fee Cut */}
+              <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-slate-800 flex items-center gap-1">
+                    <Percent size={14} className="text-orange-600" /> Platform Commission
+                  </span>
+                  <span className="text-xs font-black text-orange-600">
+                    {isCustomCommission ? `${editCustomCommission}% (Custom)` : `${editingPractitioner.nutritionist_type === "expert" ? expertCommission : inhouseCommission}% (Default)`}
+                  </span>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="flex items-center gap-2 cursor-pointer text-xs font-medium text-slate-700">
+                    <input
+                      type="radio"
+                      name="commission_type"
+                      checked={!isCustomCommission}
+                      onChange={() => setIsCustomCommission(false)}
+                      className="text-orange-600 focus:ring-orange-500 cursor-pointer"
+                    />
+                    <span>
+                      Use standard {editingPractitioner.nutritionist_type === "expert" ? "Expert" : "In-House"} policy (<strong>{editingPractitioner.nutritionist_type === "expert" ? expertCommission : inhouseCommission}%</strong>)
+                    </span>
+                  </label>
+
+                  <label className="flex items-center gap-2 cursor-pointer text-xs font-medium text-slate-700">
+                    <input
+                      type="radio"
+                      name="commission_type"
+                      checked={isCustomCommission}
+                      onChange={() => setIsCustomCommission(true)}
+                      className="text-orange-600 focus:ring-orange-500 cursor-pointer"
+                    />
+                    <span>Set custom commission rate for this practitioner</span>
+                  </label>
+
+                  {isCustomCommission && (
+                    <div className="pt-1 pl-5">
+                      <div className="relative max-w-[140px]">
+                        <input
+                          type="number"
+                          step="0.1"
+                          min="0"
+                          max="100"
+                          value={editCustomCommission}
+                          onChange={(e) => setEditCustomCommission(e.target.value)}
+                          placeholder="5.0"
+                          className="w-full pr-7 pl-3 py-1.5 text-sm font-bold bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400/20 focus:border-orange-500"
+                        />
+                        <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-xs">%</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Action buttons */}
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setEditingPractitioner(null)}
+                  className="px-4 py-2 text-xs font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl transition cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingPractitioner}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold rounded-xl transition cursor-pointer shadow-xs disabled:opacity-50"
+                >
+                  {savingPractitioner ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+                  Save Practitioner Settings
+                </button>
+              </div>
+            </form>
           </div>
-        </form>
-      </div>
-
-      {/* In-House Practitioners Compliance Directory */}
-      <div className="bg-white rounded-3xl border border-slate-200/80 shadow-2xs overflow-hidden">
-        <div className="p-6 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <h3 className="text-lg font-black text-slate-900">
-              In-House Clinicians Rate Directory ({practitioners.length} Listed)
-            </h3>
-            <p className="text-xs text-slate-500 font-medium mt-0.5">
-              Live audit view of all in-house nutritionists and their active session rates
-            </p>
-          </div>
-
-          <form onSubmit={handleSearchSubmit} className="flex items-center gap-2">
-            <div className="relative">
-              <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-              <input
-                type="text"
-                placeholder="Search clinician by name or clinic..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="pl-9 pr-4 py-2 text-xs sm:text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400/20 focus:border-orange-500 w-64"
-              />
-            </div>
-            <button
-              type="submit"
-              className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs sm:text-sm font-bold transition cursor-pointer"
-            >
-              Filter
-            </button>
-          </form>
         </div>
-
-        {/* Table */}
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs sm:text-sm">
-            <thead className="bg-slate-50/80 text-[11px] font-black uppercase text-slate-400 tracking-wider border-b border-slate-100">
-              <tr>
-                <th className="py-3.5 px-6">Practitioner Identity</th>
-                <th className="py-3.5 px-4">Affiliated Clinic</th>
-                <th className="py-3.5 px-4 text-center">Online Fee</th>
-                <th className="py-3.5 px-4 text-center">In-Clinic Fee</th>
-                <th className="py-3.5 px-4 text-center">Rate Status</th>
-                <th className="py-3.5 px-6 text-right">Verification</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {practitioners.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="py-12 text-center text-slate-400 font-medium">
-                    No in-house clinicians match the search criteria.
-                  </td>
-                </tr>
-              ) : (
-                practitioners.map((p) => {
-                  return (
-                    <tr key={p.id} className="hover:bg-slate-50/60 transition">
-                      <td className="py-3.5 px-6">
-                        <div className="flex items-center gap-3">
-                          <div className="w-9 h-9 rounded-xl bg-orange-100 text-orange-700 font-black text-xs flex items-center justify-center shrink-0">
-                            {(p.full_name || "N").slice(0, 2).toUpperCase()}
-                          </div>
-                          <div>
-                            <span className="font-bold text-slate-900 block">{p.full_name}</span>
-                            <span className="text-xs text-slate-400 font-medium block truncate max-w-xs">{p.email}</span>
-                          </div>
-                        </div>
-                      </td>
-
-                      <td className="py-3.5 px-4">
-                        <span className="text-xs font-semibold text-slate-700 capitalize">
-                          {p.current_organization || "TrackIntake Clinical Staff"}
-                        </span>
-                      </td>
-
-                      <td className="py-3.5 px-4 text-center font-mono font-bold text-slate-900">
-                        ₹{p.online_price}
-                      </td>
-
-                      <td className="py-3.5 px-4 text-center font-mono font-bold text-slate-900">
-                        ₹{p.offline_price}
-                      </td>
-
-                      <td className="py-3.5 px-4 text-center">
-                        <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold ${
-                          p.is_compliant
-                            ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                            : "bg-amber-50 text-amber-700 border border-amber-200"
-                        }`}>
-                          {p.is_compliant ? "✓ Standard Rate" : "Rate Deviation"}
-                        </span>
-                      </td>
-
-                      <td className="py-3.5 px-6 text-right">
-                        <span className={`text-[11px] font-bold px-2 py-0.5 rounded-md ${
-                          p.is_verified
-                            ? "bg-blue-50 text-blue-700 border border-blue-200"
-                            : "bg-slate-100 text-slate-500"
-                        }`}>
-                          {p.is_verified ? "Verified" : "Pending"}
-                        </span>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      )}
     </div>
   );
 }
 
+// Reusable Compact Practitioner Table
+function PractitionerTable({ title, subtitle, practitioners, search, setSearch, handleSearchSubmit, onEdit, defaultCommission }) {
+  return (
+    <div className="bg-white rounded-2xl border border-slate-200 shadow-2xs overflow-hidden">
+      <div className="p-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-50/50">
+        <div>
+          <h3 className="text-sm font-black text-slate-900">{title} ({practitioners.length})</h3>
+          <p className="text-[11px] text-slate-500 font-medium">{subtitle}</p>
+        </div>
+
+        <form onSubmit={handleSearchSubmit} className="flex items-center gap-2">
+          <div className="relative">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Search by name or clinic..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-8 pr-3 py-1.5 text-xs bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400/20 focus:border-orange-500 w-52"
+            />
+          </div>
+          <button
+            type="submit"
+            className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-bold transition cursor-pointer"
+          >
+            Filter
+          </button>
+        </form>
+      </div>
+
+      <div className="overflow-x-auto">
+        <table className="w-full text-left text-xs">
+          <thead className="bg-slate-50 text-[10px] font-black uppercase text-slate-400 tracking-wider border-b border-slate-100">
+            <tr>
+              <th className="py-2.5 px-4">Practitioner</th>
+              <th className="py-2.5 px-3">Affiliation / Org</th>
+              <th className="py-2.5 px-3 text-center">Online Fee</th>
+              <th className="py-2.5 px-3 text-center">In-Clinic Fee</th>
+              <th className="py-2.5 px-3 text-center">Commission Cut</th>
+              <th className="py-2.5 px-3 text-center">Status</th>
+              <th className="py-2.5 px-4 text-right">Action</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {practitioners.length === 0 ? (
+              <tr>
+                <td colSpan={7} className="py-8 text-center text-slate-400 font-medium">
+                  No practitioners found matching search criteria.
+                </td>
+              </tr>
+            ) : (
+              practitioners.map((p) => {
+                return (
+                  <tr key={p.id} className="hover:bg-slate-50/70 transition">
+                    <td className="py-2.5 px-4">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-7 h-7 rounded-lg bg-orange-100 text-orange-700 font-black text-[11px] flex items-center justify-center shrink-0">
+                          {(p.full_name || "N").slice(0, 2).toUpperCase()}
+                        </div>
+                        <div>
+                          <span className="font-bold text-slate-900 block truncate max-w-[160px]">{p.full_name}</span>
+                          <span className="text-[10px] text-slate-400 font-medium block truncate max-w-[160px]">{p.email}</span>
+                        </div>
+                      </div>
+                    </td>
+
+                    <td className="py-2.5 px-3">
+                      <span className="text-slate-600 font-medium truncate block max-w-[140px]">
+                        {p.current_organization || "Independent Practice"}
+                      </span>
+                    </td>
+
+                    <td className="py-2.5 px-3 text-center font-mono font-bold text-slate-900">
+                      ₹{p.online_price}
+                    </td>
+
+                    <td className="py-2.5 px-3 text-center font-mono font-bold text-slate-900">
+                      ₹{p.offline_price}
+                    </td>
+
+                    <td className="py-2.5 px-3 text-center">
+                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                        p.has_custom_commission
+                          ? "bg-purple-50 text-purple-700 border border-purple-200"
+                          : "bg-orange-50 text-orange-700 border border-orange-200"
+                      }`}>
+                        {p.effective_commission_percent}% {p.has_custom_commission ? "(Custom)" : ""}
+                      </span>
+                    </td>
+
+                    <td className="py-2.5 px-3 text-center">
+                      <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                        p.is_verified ? "bg-blue-50 text-blue-700" : "bg-slate-100 text-slate-500"
+                      }`}>
+                        {p.is_verified ? "Verified" : "Pending"}
+                      </span>
+                    </td>
+
+                    <td className="py-2.5 px-4 text-right">
+                      <button
+                        onClick={() => onEdit(p)}
+                        className="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-bold text-orange-600 hover:text-orange-700 bg-orange-50 hover:bg-orange-100 rounded-lg transition cursor-pointer"
+                      >
+                        <Edit3 size={12} />
+                        Edit
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
