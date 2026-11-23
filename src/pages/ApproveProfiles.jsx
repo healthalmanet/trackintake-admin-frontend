@@ -5,18 +5,31 @@ import {
   FileText, ExternalLink, IndianRupee, Clock, Check, X, Eye,
   Sparkles, Stethoscope, ChevronLeft, ChevronRight, UserCheck,
   Globe, AlertTriangle, Phone, Mail, MapPin, Calendar, BookOpen,
-  User, Layers, Tag, Video, Building
+  User, Layers, Tag, Video, Building, CreditCard, Crown, Heart
 } from "lucide-react";
 import { getApprovals, executeApprovalAction } from "../api/approvals";
 import { API_BASE_URL } from "../config";
 
+const CLOUDINARY_CLOUD_NAME = "dkcfeta0f";
+
 function resolveDocUrl(url) {
   if (!url) return null;
-  if (url.startsWith("http://") || url.startsWith("https://") || url.startsWith("data:")) {
-    return url;
+  const str = String(url).trim();
+  if (str.startsWith("http://") || str.startsWith("https://") || str.startsWith("data:")) {
+    return str;
   }
-  const clean = url.startsWith("/") ? url : `/${url}`;
-  return `${API_BASE_URL}${clean}`;
+  let clean = str;
+  while (clean.startsWith("/")) clean = clean.slice(1);
+
+  if (clean.startsWith("media/") || clean.startsWith("nutritionist/")) {
+    const rawExtensions = [".pdf", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx", ".txt", ".csv", ".zip"];
+    const ext = clean.substring(clean.lastIndexOf(".")).toLowerCase();
+    const resourceType = rawExtensions.includes(ext) ? "raw" : "image";
+    const cloudPath = clean.startsWith("media/") ? clean : `media/${clean}`;
+    return `https://res.cloudinary.com/${CLOUDINARY_CLOUD_NAME}/${resourceType}/upload/${cloudPath}`;
+  }
+
+  return `${API_BASE_URL}/${clean}`;
 }
 
 function formatDate(dateStr) {
@@ -557,6 +570,12 @@ export default function ApproveProfiles() {
                           <span className="font-semibold">{[selectedProfile.city, selectedProfile.country].filter(Boolean).join(", ")}</span>
                         </span>
                       )}
+                      {(selectedProfile.gender || selectedProfile.health_profile?.gender) && (
+                        <span className="flex items-center gap-1.5 text-slate-800 capitalize font-bold bg-slate-100 border border-slate-200/80 px-2.5 py-1 rounded-lg">
+                          <User size={14} className="text-slate-600" />
+                          <span>Gender: {selectedProfile.gender || selectedProfile.health_profile?.gender}</span>
+                        </span>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -570,8 +589,8 @@ export default function ApproveProfiles() {
                 </button>
               </div>
 
-              {/* Quick Clinical Metrics Strip */}
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 p-4 sm:p-5 bg-slate-50/80 border-b border-slate-100">
+              {/* Quick Clinical & Subscription Metrics Strip */}
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 p-4 sm:p-5 bg-slate-50/80 border-b border-slate-100">
                 <div className="bg-white p-3.5 sm:p-4 rounded-2xl border border-slate-200/90 shadow-2xs">
                   <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">Clinical Experience</span>
                   <strong className="text-xl sm:text-2xl font-black text-slate-900 mt-1 block">{selectedProfile.years_of_experience || 0} Years</strong>
@@ -594,6 +613,23 @@ export default function ApproveProfiles() {
                   </strong>
                   <span className="text-xs text-slate-500 truncate block mt-0.5">Council: <span className="font-semibold text-slate-700 uppercase">{selectedProfile.issuing_authority || "Medical Authority"}</span></span>
                 </div>
+                <div className={`p-3.5 sm:p-4 rounded-2xl border shadow-2xs ${
+                  selectedProfile.active_subscription
+                    ? "bg-gradient-to-br from-amber-50 to-orange-50/40 border-amber-200"
+                    : "bg-white border-slate-200"
+                }`}>
+                  <span className="text-xs font-bold uppercase tracking-wider block flex items-center gap-1.5 text-amber-600">
+                    <Crown size={14} className="text-amber-500" /> Subscription Plan
+                  </span>
+                  <strong className="text-base sm:text-lg font-black text-slate-900 mt-1 block truncate">
+                    {selectedProfile.active_subscription ? `${selectedProfile.active_subscription.plan_name} (₹${selectedProfile.active_subscription.price})` : "No Active Plan"}
+                  </strong>
+                  <span className={`text-xs font-semibold mt-0.5 block truncate ${selectedProfile.active_subscription ? "text-emerald-600" : "text-slate-400"}`}>
+                    {selectedProfile.active_subscription
+                      ? `✓ Active till ${formatDate(selectedProfile.active_subscription.end_date)}`
+                      : "Free Platform Tier"}
+                  </span>
+                </div>
               </div>
 
               {/* Segmented Tab Navigation inside Modal */}
@@ -602,6 +638,7 @@ export default function ApproveProfiles() {
                   { id: "overview", label: "Credentials & Clinical Profile", icon: Stethoscope },
                   { id: "specialties", label: `Specialties & Languages (${(selectedProfile.specializations || []).length})`, icon: Sparkles },
                   { id: "pricing", label: "Consultation Rates & Channels", icon: IndianRupee },
+                  { id: "subscriptions", label: `Subscription & Billing (${(selectedProfile.subscriptions || []).length})`, icon: CreditCard },
                   { id: "documents", label: `Submitted Credentials (${uploadedDocsCount}/4)`, icon: FileText },
                 ].map(tab => {
                   const Icon = tab.icon;
@@ -955,6 +992,182 @@ export default function ApproveProfiles() {
                     </div>
                   </div>
                 )}
+
+                {/* TAB 5: SUBSCRIPTIONS & BILLING */}
+                {modalTab === "subscriptions" && (
+                  <div className="space-y-6">
+                    {/* Active Subscription Banner */}
+                    <div>
+                      <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Active Subscription Status</h4>
+                      {selectedProfile.active_subscription ? (
+                        <div className="p-6 rounded-2xl bg-gradient-to-r from-amber-500/10 via-orange-500/5 to-white border border-amber-200 shadow-xs space-y-4">
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                            <div className="flex items-center gap-3.5">
+                              <div className="w-12 h-12 rounded-xl bg-gradient-to-tr from-amber-500 to-orange-500 text-white flex items-center justify-center shadow-md shadow-amber-500/20">
+                                <Crown size={24} />
+                              </div>
+                              <div>
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <h3 className="text-lg font-black text-slate-900">{selectedProfile.active_subscription.plan_name}</h3>
+                                  <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                    ✓ Running Active
+                                  </span>
+                                  <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-orange-100 text-orange-700 capitalize">
+                                    {selectedProfile.active_subscription.plan_type || "Nutritionist"}
+                                  </span>
+                                </div>
+                                <p className="text-xs text-slate-500 mt-1">
+                                  Active Period: <strong className="text-slate-700">{formatDate(selectedProfile.active_subscription.start_date)}</strong> → <strong className="text-slate-700">{formatDate(selectedProfile.active_subscription.end_date)}</strong>
+                                  {selectedProfile.active_subscription.duration_days > 0 && ` (${selectedProfile.active_subscription.duration_days} Days)`}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="text-left sm:text-right">
+                              <span className="text-xs text-slate-400 font-bold uppercase tracking-wider block">Plan Fee</span>
+                              <strong className="text-2xl font-black text-slate-900">₹{selectedProfile.active_subscription.price}</strong>
+                            </div>
+                          </div>
+
+                          {/* Quotas & Limits */}
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
+                            <div className="p-3 bg-white/80 rounded-xl border border-slate-200">
+                              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wide block">Max Assigned Patients</span>
+                              <p className="text-base font-black text-slate-900 mt-0.5">
+                                {selectedProfile.active_subscription.nutri_max_patients !== undefined && selectedProfile.active_subscription.nutri_max_patients !== null
+                                  ? (selectedProfile.active_subscription.nutri_max_patients === 0 ? "Unlimited / Platform Default" : `${selectedProfile.active_subscription.nutri_max_patients} Patients`)
+                                  : "Standard Quota"}
+                              </p>
+                            </div>
+                            <div className="p-3 bg-white/80 rounded-xl border border-slate-200">
+                              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wide block">In-House Consults Remaining</span>
+                              <p className="text-base font-black text-slate-900 mt-0.5">
+                                {selectedProfile.active_subscription.remaining_inhouse ?? "—"}
+                              </p>
+                            </div>
+                            <div className="p-3 bg-white/80 rounded-xl border border-slate-200">
+                              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wide block">Expert Consults Remaining</span>
+                              <p className="text-base font-black text-slate-900 mt-0.5">
+                                {selectedProfile.active_subscription.remaining_expert ?? "—"}
+                              </p>
+                            </div>
+                          </div>
+
+                          {/* Features Granted */}
+                          {selectedProfile.active_subscription.features && (
+                            <div className="pt-2">
+                              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-2">Granted Feature Privileges</span>
+                              <div className="flex flex-wrap gap-2">
+                                {[
+                                  { label: "AI Diet Plans", enabled: selectedProfile.active_subscription.features.ai_diet },
+                                  { label: "Manual Diet Plans", enabled: selectedProfile.active_subscription.features.manual_diet },
+                                  { label: "Chat Support", enabled: selectedProfile.active_subscription.features.chat },
+                                  { label: "Online Telehealth", enabled: selectedProfile.active_subscription.features.online_appointment },
+                                  { label: "In-Clinic Visits", enabled: selectedProfile.active_subscription.features.offline_appointment },
+                                ].map((feat, i) => (
+                                  <span
+                                    key={i}
+                                    className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-bold border ${
+                                      feat.enabled
+                                        ? "bg-emerald-50 text-emerald-800 border-emerald-200"
+                                        : "bg-slate-100 text-slate-400 border-slate-200"
+                                    }`}
+                                  >
+                                    <span>{feat.enabled ? "✓" : "✕"}</span>
+                                    <span>{feat.label}</span>
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="p-8 text-center bg-slate-50 border border-slate-200 rounded-2xl">
+                          <CreditCard size={36} className="text-slate-300 mx-auto mb-2" />
+                          <h4 className="text-sm font-bold text-slate-700">No Active Subscription</h4>
+                          <p className="text-xs text-slate-400 mt-1">This nutritionist is currently on the free platform tier or has not purchased a subscription.</p>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* All Subscriptions History Table */}
+                    {selectedProfile.subscriptions && selectedProfile.subscriptions.length > 0 && (
+                      <div>
+                        <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Subscription History ({selectedProfile.subscriptions.length})</h4>
+                        <div className="overflow-x-auto rounded-2xl border border-slate-200">
+                          <table className="w-full text-left text-xs">
+                            <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold uppercase tracking-wider">
+                              <tr>
+                                <th className="p-3">Plan Name</th>
+                                <th className="p-3">Price</th>
+                                <th className="p-3">Start Date</th>
+                                <th className="p-3">End Date</th>
+                                <th className="p-3">Status</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100 bg-white">
+                              {selectedProfile.subscriptions.map((sub, idx) => (
+                                <tr key={idx} className="hover:bg-slate-50/50">
+                                  <td className="p-3 font-bold text-slate-900">{sub.plan_name}</td>
+                                  <td className="p-3 font-semibold text-slate-700">₹{sub.price}</td>
+                                  <td className="p-3 text-slate-500">{formatDate(sub.start_date)}</td>
+                                  <td className="p-3 text-slate-500">{formatDate(sub.end_date)}</td>
+                                  <td className="p-3">
+                                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                      sub.is_active ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : "bg-slate-100 text-slate-500"
+                                    }`}>
+                                      {sub.is_active ? "Active" : "Expired"}
+                                    </span>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Payments History */}
+                    {selectedProfile.payments && selectedProfile.payments.length > 0 && (
+                      <div>
+                        <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Payment Receipts & Transactions ({selectedProfile.payments.length})</h4>
+                        <div className="overflow-x-auto rounded-2xl border border-slate-200">
+                          <table className="w-full text-left text-xs">
+                            <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold uppercase tracking-wider">
+                              <tr>
+                                <th className="p-3">Payment ID / Order</th>
+                                <th className="p-3">Plan</th>
+                                <th className="p-3">Amount</th>
+                                <th className="p-3">Date</th>
+                                <th className="p-3">Status</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100 bg-white">
+                              {selectedProfile.payments.map((p, idx) => (
+                                <tr key={idx} className="hover:bg-slate-50/50">
+                                  <td className="p-3 font-mono text-slate-700">
+                                    <div className="font-bold">{p.payment_id || p.order_id || `#${p.id}`}</div>
+                                    {p.order_id && p.payment_id && <div className="text-[10px] text-slate-400">{p.order_id}</div>}
+                                  </td>
+                                  <td className="p-3 font-medium text-slate-700">{p.plan_name || "Plan Purchase"}</td>
+                                  <td className="p-3 font-black text-slate-900">₹{p.amount}</td>
+                                  <td className="p-3 text-slate-500">{formatDate(p.created_at)}</td>
+                                  <td className="p-3">
+                                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                      p.status === "success" ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : "bg-rose-50 text-rose-700 border border-rose-200"
+                                    }`}>
+                                      {p.status}
+                                    </span>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
               </div>
 
               {/* Rejection Reason Form (if opened) */}
