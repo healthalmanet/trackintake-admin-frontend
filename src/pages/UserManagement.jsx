@@ -764,6 +764,7 @@ function UserDetailModal({ userId, onClose }) {
           nutritionist_type: u.nutritionist_type || d.nutritionist_type || "",
           city: u.city || d.city || (d.health_profile && d.health_profile.city) || "",
           country: u.country || d.country || (d.health_profile && d.health_profile.country) || "",
+          gender: u.gender || d.gender || (d.health_profile && d.health_profile.gender) || "",
           health_profile: d.health_profile || u.health_profile || null,
           nutritionist_profile: d.nutritionist_profile || u.nutritionist_profile || null,
           subscriptions: d.subscriptions || u.subscriptions || [],
@@ -943,6 +944,7 @@ function UserDetailModal({ userId, onClose }) {
 
   const visibleTabs = TABS.filter(t => {
     if (t.id === "clinician" && data?.role !== "nutritionist") return false;
+    if (t.id === "health" && data?.role === "nutritionist") return false;
     return true;
   });
 
@@ -989,9 +991,14 @@ function UserDetailModal({ userId, onClose }) {
                     </span>
                   )}
                 </div>
-                <p className="text-sm text-slate-500 mt-1 truncate font-medium">
-                  {data.email} · ID #{data.id}
-                </p>
+                <div className="flex items-center gap-3 text-sm text-slate-500 mt-1 flex-wrap font-medium">
+                  <span>{data.email} · ID #{data.id}</span>
+                  {(data.gender || (data.health_profile && data.health_profile.gender)) && (
+                    <span className="capitalize bg-slate-100 border border-slate-200/80 px-2.5 py-0.5 rounded-lg text-xs font-semibold text-slate-700">
+                      Gender: {data.gender || data.health_profile.gender}
+                    </span>
+                  )}
+                </div>
               </div>
 
               <div className="flex items-center gap-2 sm:gap-3 shrink-0 flex-wrap justify-end">

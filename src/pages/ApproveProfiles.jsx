@@ -570,6 +570,12 @@ export default function ApproveProfiles() {
                           <span className="font-semibold">{[selectedProfile.city, selectedProfile.country].filter(Boolean).join(", ")}</span>
                         </span>
                       )}
+                      {(selectedProfile.gender || selectedProfile.health_profile?.gender) && (
+                        <span className="flex items-center gap-1.5 text-slate-800 capitalize font-bold bg-slate-100 border border-slate-200/80 px-2.5 py-1 rounded-lg">
+                          <User size={14} className="text-slate-600" />
+                          <span>Gender: {selectedProfile.gender || selectedProfile.health_profile?.gender}</span>
+                        </span>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -634,9 +640,6 @@ export default function ApproveProfiles() {
                   { id: "pricing", label: "Consultation Rates & Channels", icon: IndianRupee },
                   { id: "subscriptions", label: `Subscription & Billing (${(selectedProfile.subscriptions || []).length})`, icon: CreditCard },
                   { id: "documents", label: `Submitted Credentials (${uploadedDocsCount}/4)`, icon: FileText },
-                  ...(selectedProfile.health_profile && (selectedProfile.health_profile.gender || selectedProfile.health_profile.height_cm || selectedProfile.health_profile.weight_kg)
-                    ? [{ id: "health", label: "Health & Vitals", icon: Heart }]
-                    : []),
                 ].map(tab => {
                   const Icon = tab.icon;
                   const isActive = modalTab === tab.id;
@@ -1165,38 +1168,6 @@ export default function ApproveProfiles() {
                   </div>
                 )}
 
-                {/* TAB 6: HEALTH & VITALS (IF AVAILABLE) */}
-                {modalTab === "health" && selectedProfile.health_profile && (
-                  <div className="space-y-4">
-                    <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Registered Health & Personal Vitals</h4>
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                      <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200">
-                        <span className="text-[11px] font-bold text-slate-400 uppercase block">Gender</span>
-                        <p className="text-base font-black text-slate-900 mt-1 capitalize">{selectedProfile.health_profile.gender || "—"}</p>
-                      </div>
-                      <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200">
-                        <span className="text-[11px] font-bold text-slate-400 uppercase block">Height</span>
-                        <p className="text-base font-black text-slate-900 mt-1">{selectedProfile.health_profile.height_cm ? `${selectedProfile.health_profile.height_cm} cm` : "—"}</p>
-                      </div>
-                      <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200">
-                        <span className="text-[11px] font-bold text-slate-400 uppercase block">Weight</span>
-                        <p className="text-base font-black text-slate-900 mt-1">{selectedProfile.health_profile.weight_kg ? `${selectedProfile.health_profile.weight_kg} kg` : "—"}</p>
-                      </div>
-                      <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200">
-                        <span className="text-[11px] font-bold text-slate-400 uppercase block">Diet Preference</span>
-                        <p className="text-base font-black text-slate-900 mt-1 capitalize">{selectedProfile.health_profile.diet_type || "—"}</p>
-                      </div>
-                      <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200">
-                        <span className="text-[11px] font-bold text-slate-400 uppercase block">Activity Level</span>
-                        <p className="text-base font-black text-slate-900 mt-1 capitalize">{selectedProfile.health_profile.activity_level || "—"}</p>
-                      </div>
-                      <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200">
-                        <span className="text-[11px] font-bold text-slate-400 uppercase block">Health Goal</span>
-                        <p className="text-base font-black text-slate-900 mt-1 capitalize">{selectedProfile.health_profile.goal || "—"}</p>
-                      </div>
-                    </div>
-                  </div>
-                )}
               </div>
 
               {/* Rejection Reason Form (if opened) */}
