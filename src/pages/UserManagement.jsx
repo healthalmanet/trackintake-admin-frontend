@@ -3,7 +3,8 @@ import {
   Search, Eye, ChevronDown, Loader2, X, MapPin, Calendar, CheckCircle, XCircle,
   User, Heart, Stethoscope, CreditCard, CalendarCheck, Shield, Phone, Mail,
   ChevronLeft, ChevronRight, Save, Key, AlertCircle, Building, Star, Globe,
-  Filter, RotateCcw, Copy, Check, Building2, Award, Sparkles, ShieldAlert, ShieldCheck, Ban
+  Filter, RotateCcw, Copy, Check, Building2, Award, Sparkles, ShieldAlert, ShieldCheck, Ban,
+  Crown, FileText, ExternalLink, Video, IndianRupee
 } from "lucide-react";
 import * as api from "../api/users";
 import { API_BASE_URL } from "../config";
@@ -766,6 +767,7 @@ function UserDetailModal({ userId, onClose }) {
           health_profile: d.health_profile || u.health_profile || null,
           nutritionist_profile: d.nutritionist_profile || u.nutritionist_profile || null,
           subscriptions: d.subscriptions || u.subscriptions || [],
+          active_subscription: d.active_subscription || (d.subscriptions && d.subscriptions.find(s => s.is_active)) || null,
           payments: d.payments || u.payments || [],
           appointments: d.appointments || u.appointments || [],
         };
@@ -973,6 +975,19 @@ function UserDetailModal({ userId, onClose }) {
                   }`}>
                     {data.is_active ? "Active · Login Allowed" : "Blocked · Login Disabled"}
                   </span>
+                  {data.role === "nutritionist" && data.nutritionist_profile && (
+                    <span className={`px-3 py-1 rounded-full text-xs font-bold border shadow-2xs ${
+                      data.nutritionist_profile.is_verified ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-amber-50 text-amber-700 border-amber-200"
+                    }`}>
+                      {data.nutritionist_profile.is_verified ? "✓ Verified Staff" : "⏳ Pending Review"}
+                    </span>
+                  )}
+                  {data.active_subscription && (
+                    <span className="px-3 py-1 rounded-full text-xs font-bold bg-amber-50 text-amber-800 border border-amber-200 shadow-2xs flex items-center gap-1.5">
+                      <Crown size={13} className="text-amber-500" />
+                      {data.active_subscription.plan_name} (₹{data.active_subscription.price})
+                    </span>
+                  )}
                 </div>
                 <p className="text-sm text-slate-500 mt-1 truncate font-medium">
                   {data.email} · ID #{data.id}
@@ -1179,8 +1194,7 @@ function UserDetailModal({ userId, onClose }) {
 
               {/* CLINICIAN TAB */}
               {activeTab === "clinician" && (
-                <div className="space-y-4">
-                  <h3 className="text-xs font-extrabold text-purple-600 uppercase tracking-wider">Practitioner Registration & Licensing</h3>
+                <div className="space-y-5">
                   {!data.nutritionist_profile ? (
                     <div className="bg-purple-50/50 border border-purple-100 rounded-2xl p-8 text-center">
                       <Stethoscope size={32} className="text-purple-300 mx-auto mb-2" />
@@ -1188,6 +1202,58 @@ function UserDetailModal({ userId, onClose }) {
                     </div>
                   ) : (
                     <>
+                      {/* Practitioner Verification Audit Banner */}
+                      <div className={`p-4 rounded-2xl border flex flex-wrap items-center justify-between gap-3 text-sm ${
+                        data.nutritionist_profile.is_verified
+                          ? "bg-emerald-50/70 border-emerald-200 text-emerald-900"
+                          : "bg-amber-50/70 border-amber-200 text-amber-900"
+                      }`}>
+                        <div className="flex items-center gap-2.5 font-bold">
+                          {data.nutritionist_profile.is_verified ? (
+                            <ShieldCheck size={20} className="text-emerald-600" />
+                          ) : (
+                            <ShieldAlert size={20} className="text-amber-600" />
+                          )}
+                          <span>Audit Verification Status:</span>
+                          <span className={`px-2.5 py-0.5 rounded-full text-xs font-black uppercase ${
+                            data.nutritionist_profile.is_verified ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"
+                          }`}>
+                            {data.nutritionist_profile.is_verified ? "✓ Verified Practitioner" : "⏳ Pending Verification"}
+                          </span>
+                        </div>
+                        {data.nutritionist_profile.verified_at && (
+                          <span className="text-xs text-slate-500 font-medium">
+                            Verified on: <strong className="text-slate-700">{fmt(data.nutritionist_profile.verified_at)}</strong>
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Quick Clinical Metrics */}
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                        <div className="bg-slate-50/80 p-3.5 rounded-2xl border border-slate-100">
+                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Clinical Experience</span>
+                          <strong className="text-lg font-black text-slate-900 mt-0.5 block">{data.nutritionist_profile.years_of_experience || 0} Years</strong>
+                          <span className="text-[11px] text-slate-500">Practicing clinician</span>
+                        </div>
+                        <div className="bg-slate-50/80 p-3.5 rounded-2xl border border-slate-100">
+                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Assigned Patients</span>
+                          <strong className="text-lg font-black text-blue-600 mt-0.5 block">{data.nutritionist_profile.assigned_patients_count || 0} Patients</strong>
+                          <span className="text-[11px] text-slate-500">Active caseload</span>
+                        </div>
+                        <div className="bg-slate-50/80 p-3.5 rounded-2xl border border-slate-100">
+                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Consultations Delivered</span>
+                          <strong className="text-lg font-black text-emerald-600 mt-0.5 block">{data.nutritionist_profile.total_appointments_count || 0} Sessions</strong>
+                          <span className="text-[11px] text-slate-500">Completed bookings</span>
+                        </div>
+                        <div className="bg-slate-50/80 p-3.5 rounded-2xl border border-slate-100">
+                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">License Registration</span>
+                          <strong className="text-sm font-mono font-black text-slate-900 mt-0.5 block truncate">
+                            {data.nutritionist_profile.registration_number || "Not on file"}
+                          </strong>
+                          <span className="text-[11px] text-slate-500 truncate block">Council: {data.nutritionist_profile.issuing_authority || "Medical Authority"}</span>
+                        </div>
+                      </div>
+
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <Field label="Professional Title" value={f("professional_title")} edit={editing} onChange={setF("professional_title")} />
                         <Field label="Degree / Qualification" value={f("qualification")} edit={editing} onChange={setF("qualification")} />
@@ -1250,41 +1316,131 @@ function UserDetailModal({ userId, onClose }) {
                         </div>
                       )}
 
-                      <div className="grid grid-cols-2 gap-3">
-                        <Field label="Online Session Fee (₹)" value={f("online_price")} edit={editing} onChange={setF("online_price")} type="number" />
-                        <Field label="In-Person Fee (₹)" value={f("offline_price")} edit={editing} onChange={setF("offline_price")} type="number" />
-                      </div>
-
-                      {/* Submitted Documents */}
-                      {[
-                        ["Government Photo ID", data.nutritionist_profile.government_id || data.nutritionist_profile.documents?.government_id],
-                        ["Qualification Degree", data.nutritionist_profile.qualification_certificate || data.nutritionist_profile.documents?.qualification_certificate],
-                        ["Medical Council Registration", data.nutritionist_profile.registration_certificate || data.nutritionist_profile.documents?.registration_certificate],
-                        ["Clinical Experience Proof", data.nutritionist_profile.experience_certificate || data.nutritionist_profile.documents?.experience_certificate],
-                      ].filter(([, v]) => v).length > 0 && (
-                        <div className="pt-2">
-                          <h4 className="text-[11px] font-extrabold text-slate-400 uppercase tracking-wider mb-2">Verified Documents & Credentials</h4>
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                            {[
-                              ["Government Photo ID", data.nutritionist_profile.government_id || data.nutritionist_profile.documents?.government_id],
-                              ["Qualification Degree", data.nutritionist_profile.qualification_certificate || data.nutritionist_profile.documents?.qualification_certificate],
-                              ["Medical Council Registration", data.nutritionist_profile.registration_certificate || data.nutritionist_profile.documents?.registration_certificate],
-                              ["Clinical Experience Proof", data.nutritionist_profile.experience_certificate || data.nutritionist_profile.documents?.experience_certificate],
-                            ].filter(([, v]) => v).map(([label, url]) => (
-                              <a
-                                key={label}
-                                href={resolveDocUrl(url)}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="flex items-center justify-between px-3.5 py-2.5 bg-blue-50/60 hover:bg-blue-100 text-blue-700 rounded-xl text-xs font-bold border border-blue-200 transition"
-                              >
-                                <span className="flex items-center gap-2"><Globe size={14} /> {label}</span>
-                                <span className="text-[10px] uppercase font-black">View File ↗</span>
-                              </a>
-                            ))}
-                          </div>
+                      {data.nutritionist_profile.additional_certifications && (
+                        <div className="bg-slate-50/80 rounded-xl p-3.5 border border-slate-100">
+                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Additional Certifications & Fellowships</p>
+                          <p className="text-xs md:text-sm text-slate-700 font-medium">
+                            {data.nutritionist_profile.additional_certifications}
+                          </p>
                         </div>
                       )}
+
+                      {/* Practice Channels & Fees */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div className="p-4 bg-slate-50/80 rounded-2xl border border-slate-100 space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className="font-bold text-slate-900 text-xs flex items-center gap-1.5">
+                              <Video size={14} className="text-blue-600" /> Online Telehealth
+                            </span>
+                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                              data.nutritionist_profile.is_online_available ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : "bg-slate-200 text-slate-600"
+                            }`}>
+                              {data.nutritionist_profile.is_online_available ? "Active" : "Disabled"}
+                            </span>
+                          </div>
+                          <div className="text-xs">
+                            <span className="text-slate-400 font-medium block">Current Rate:</span>
+                            <strong className="text-lg font-black text-slate-900">₹{data.nutritionist_profile.online_price || 0}</strong>
+                            <p className="text-[11px] text-slate-500 mt-0.5">Mode: {data.nutritionist_profile.is_virtual_enabled ? "Video & Chat Enabled" : "Chat/Audio"}</p>
+                          </div>
+                        </div>
+
+                        <div className="p-4 bg-slate-50/80 rounded-2xl border border-slate-100 space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className="font-bold text-slate-900 text-xs flex items-center gap-1.5">
+                              <Building2 size={14} className="text-purple-600" /> In-Clinic Physical Practice
+                            </span>
+                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                              data.nutritionist_profile.is_offline_available ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : "bg-slate-200 text-slate-600"
+                            }`}>
+                              {data.nutritionist_profile.is_offline_available ? "Active" : "Disabled"}
+                            </span>
+                          </div>
+                          <div className="text-xs">
+                            <span className="text-slate-400 font-medium block">Current Rate:</span>
+                            <strong className="text-lg font-black text-slate-900">₹{data.nutritionist_profile.offline_price || 0}</strong>
+                            <p className="text-[11px] text-slate-500 truncate mt-0.5">Location: {data.nutritionist_profile.offline_location || "Clinic address on record"}</p>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Pending Price Request if any */}
+                      {(data.nutritionist_profile.pending_online_price || data.nutritionist_profile.pending_offline_price) && (
+                        <div className="p-4 bg-purple-50 border border-purple-200 rounded-2xl flex items-center justify-between text-xs">
+                          <div>
+                            <span className="font-extrabold text-purple-900 block">Pending Rate Revision Request:</span>
+                            <span className="text-purple-700">
+                              Online: ₹{data.nutritionist_profile.pending_online_price ?? data.nutritionist_profile.online_price} · In-Clinic: ₹{data.nutritionist_profile.pending_offline_price ?? data.nutritionist_profile.offline_price}
+                            </span>
+                          </div>
+                          <span className="px-2.5 py-1 bg-purple-200 text-purple-800 font-bold rounded-lg text-[11px]">
+                            Review Pending
+                          </span>
+                        </div>
+                      )}
+
+                      {/* Submitted Verification Documents */}
+                      <div className="pt-2 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <h4 className="text-[11px] font-extrabold text-slate-400 uppercase tracking-wider">Official Verification Credentials & Documents</h4>
+                          <span className="text-xs font-bold text-slate-500">
+                            {[
+                              data.nutritionist_profile.government_id || data.nutritionist_profile.documents?.government_id,
+                              data.nutritionist_profile.qualification_certificate || data.nutritionist_profile.documents?.qualification_certificate,
+                              data.nutritionist_profile.registration_certificate || data.nutritionist_profile.documents?.registration_certificate,
+                              data.nutritionist_profile.experience_certificate || data.nutritionist_profile.documents?.experience_certificate,
+                            ].filter(Boolean).length} of 4 Uploaded
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          {[
+                            { label: "Government Photo ID Document", url: data.nutritionist_profile.government_id || data.nutritionist_profile.documents?.government_id },
+                            { label: "Degree Qualification Certificate", url: data.nutritionist_profile.qualification_certificate || data.nutritionist_profile.documents?.qualification_certificate },
+                            { label: "Medical Council Registration", url: data.nutritionist_profile.registration_certificate || data.nutritionist_profile.documents?.registration_certificate },
+                            { label: "Clinical Experience Proof", url: data.nutritionist_profile.experience_certificate || data.nutritionist_profile.documents?.experience_certificate },
+                          ].map(({ label, url }) => {
+                            const resolved = resolveDocUrl(url);
+                            return (
+                              <div
+                                key={label}
+                                className={`p-4 rounded-xl border flex flex-col justify-between gap-3 ${
+                                  resolved ? "bg-white border-slate-200 shadow-2xs" : "bg-slate-50/70 border-slate-200/60"
+                                }`}
+                              >
+                                <div className="flex items-start justify-between gap-2">
+                                  <div className="flex items-center gap-2.5">
+                                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
+                                      resolved ? "bg-orange-50 text-orange-600" : "bg-slate-100 text-slate-400"
+                                    }`}>
+                                      <FileText size={16} />
+                                    </div>
+                                    <span className="text-xs font-bold text-slate-900 leading-tight">{label}</span>
+                                  </div>
+                                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ${
+                                    resolved ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : "bg-slate-200 text-slate-600"
+                                  }`}>
+                                    {resolved ? "✓ Uploaded" : "Missing"}
+                                  </span>
+                                </div>
+                                <div className="pt-2 border-t border-slate-100 flex justify-end">
+                                  {resolved ? (
+                                    <a
+                                      href={resolved}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="inline-flex items-center gap-1.5 text-xs font-bold text-orange-600 hover:text-orange-700 bg-orange-50 hover:bg-orange-100 px-3 py-1.5 rounded-lg border border-orange-200 transition cursor-pointer"
+                                    >
+                                      View Document <ExternalLink size={13} />
+                                    </a>
+                                  ) : (
+                                    <span className="text-[11px] text-slate-400 italic">No document file on file</span>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
                     </>
                   )}
                 </div>
@@ -1292,56 +1448,173 @@ function UserDetailModal({ userId, onClose }) {
 
               {/* SUBSCRIPTIONS TAB */}
               {activeTab === "subscriptions" && (
-                <div className="space-y-4">
-                  <h3 className="text-xs font-extrabold text-slate-400 uppercase tracking-wider">Active & Historical Subscriptions</h3>
-                  {(!data.subscriptions || data.subscriptions.length === 0) ? (
-                    <div className="bg-slate-50 border border-slate-100 rounded-2xl p-8 text-center">
-                      <CreditCard size={32} className="text-slate-300 mx-auto mb-2" />
-                      <p className="text-sm font-bold text-slate-700">No active subscriptions</p>
-                    </div>
-                  ) : (
-                    <div className="space-y-2.5">
-                      {data.subscriptions.map((sub, i) => (
-                        <div key={i} className="bg-white border border-slate-200 rounded-xl p-4 shadow-xs">
-                          <div className="flex items-start justify-between gap-3">
+                <div className="space-y-6">
+                  {/* Active Subscription Banner */}
+                  <div>
+                    <h3 className="text-xs font-extrabold text-slate-400 uppercase tracking-wider mb-3">Active Subscription Status</h3>
+                    {data.active_subscription ? (
+                      <div className="p-5 rounded-2xl bg-gradient-to-r from-amber-500/10 via-orange-500/5 to-white border border-amber-200 shadow-xs space-y-4">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                          <div className="flex items-center gap-3.5">
+                            <div className="w-12 h-12 rounded-xl bg-gradient-to-tr from-amber-500 to-orange-500 text-white flex items-center justify-center shadow-md shadow-amber-500/20">
+                              <Crown size={24} />
+                            </div>
                             <div>
-                              <p className="font-bold text-slate-900">{sub.plan_name || `Plan #${sub.plan_id}`}</p>
-                              <p className="text-xs text-slate-400 font-medium mt-0.5">{fmt(sub.start_date)} → {fmt(sub.end_date)}</p>
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <h3 className="text-lg font-black text-slate-900">{data.active_subscription.plan_name}</h3>
+                                <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                  ✓ Running Active
+                                </span>
+                                <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-orange-100 text-orange-700 capitalize">
+                                  {data.active_subscription.plan_type || "Plan"}
+                                </span>
+                              </div>
+                              <p className="text-xs text-slate-500 mt-1">
+                                Validity: <strong className="text-slate-700">{fmt(data.active_subscription.start_date)}</strong> → <strong className="text-slate-700">{fmt(data.active_subscription.end_date)}</strong>
+                                {data.active_subscription.duration_days > 0 && ` (${data.active_subscription.duration_days} Days)`}
+                              </p>
                             </div>
-                            <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${
-                              sub.is_active ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : "bg-slate-100 text-slate-500"
-                            }`}>
-                              {sub.is_active ? "Running Active" : "Expired"}
-                            </span>
                           </div>
-                          {(sub.remaining_inhouse !== undefined || sub.remaining_expert !== undefined) && (
-                            <div className="flex gap-4 mt-2.5 pt-2.5 border-t border-slate-100 text-xs font-semibold text-slate-600">
-                              <span>🏢 In-House Remaining: <strong className="text-slate-900">{sub.remaining_inhouse ?? "—"}</strong></span>
-                              <span>⭐ Specialist Remaining: <strong className="text-slate-900">{sub.remaining_expert ?? "—"}</strong></span>
-                            </div>
-                          )}
+                          <div className="text-left sm:text-right">
+                            <span className="text-xs text-slate-400 font-bold uppercase tracking-wider block">Plan Fee</span>
+                            <strong className="text-2xl font-black text-slate-900">₹{data.active_subscription.price}</strong>
+                          </div>
                         </div>
-                      ))}
+
+                        {/* Quotas & Limits */}
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
+                          <div className="p-3 bg-white/80 rounded-xl border border-slate-200">
+                            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wide block">Max Patients Allowed</span>
+                            <p className="text-base font-black text-slate-900 mt-0.5">
+                              {data.active_subscription.nutri_max_patients !== undefined && data.active_subscription.nutri_max_patients !== null
+                                ? (data.active_subscription.nutri_max_patients === 0 ? "Unlimited / Platform Default" : `${data.active_subscription.nutri_max_patients} Patients`)
+                                : "Standard Quota"}
+                            </p>
+                          </div>
+                          <div className="p-3 bg-white/80 rounded-xl border border-slate-200">
+                            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wide block">In-House Consults Remaining</span>
+                            <p className="text-base font-black text-slate-900 mt-0.5">
+                              {data.active_subscription.remaining_inhouse ?? "—"}
+                            </p>
+                          </div>
+                          <div className="p-3 bg-white/80 rounded-xl border border-slate-200">
+                            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wide block">Expert Consults Remaining</span>
+                            <p className="text-base font-black text-slate-900 mt-0.5">
+                              {data.active_subscription.remaining_expert ?? "—"}
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Granted Features */}
+                        {data.active_subscription.features && (
+                          <div className="pt-1">
+                            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-2">Granted Feature Privileges</span>
+                            <div className="flex flex-wrap gap-2">
+                              {[
+                                { label: "AI Diet Plans", enabled: data.active_subscription.features.ai_diet },
+                                { label: "Manual Diet Plans", enabled: data.active_subscription.features.manual_diet },
+                                { label: "Chat Support", enabled: data.active_subscription.features.chat },
+                                { label: "Online Telehealth", enabled: data.active_subscription.features.online_appointment },
+                                { label: "In-Clinic Visits", enabled: data.active_subscription.features.offline_appointment },
+                              ].map((feat, i) => (
+                                <span
+                                  key={i}
+                                  className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-bold border ${
+                                    feat.enabled
+                                      ? "bg-emerald-50 text-emerald-800 border-emerald-200"
+                                      : "bg-slate-100 text-slate-400 border-slate-200"
+                                  }`}
+                                >
+                                  <span>{feat.enabled ? "✓" : "✕"}</span>
+                                  <span>{feat.label}</span>
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="bg-slate-50 border border-slate-200 rounded-2xl p-8 text-center">
+                        <CreditCard size={36} className="text-slate-300 mx-auto mb-2" />
+                        <p className="text-sm font-bold text-slate-700">No active subscriptions</p>
+                        <p className="text-xs text-slate-400 mt-1">This user is currently on the free tier or has an expired subscription.</p>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* All Subscriptions History Table */}
+                  {data.subscriptions && data.subscriptions.length > 0 && (
+                    <div>
+                      <h3 className="text-xs font-extrabold text-slate-400 uppercase tracking-wider mb-3">All Subscriptions ({data.subscriptions.length})</h3>
+                      <div className="overflow-x-auto rounded-2xl border border-slate-200">
+                        <table className="w-full text-left text-xs">
+                          <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold uppercase tracking-wider">
+                            <tr>
+                              <th className="p-3">Plan Name</th>
+                              <th className="p-3">Price</th>
+                              <th className="p-3">Start Date</th>
+                              <th className="p-3">End Date</th>
+                              <th className="p-3">Status</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100 bg-white">
+                            {data.subscriptions.map((sub, idx) => (
+                              <tr key={idx} className="hover:bg-slate-50/50">
+                                <td className="p-3 font-bold text-slate-900">{sub.plan_name || `Plan #${sub.plan_id}`}</td>
+                                <td className="p-3 font-semibold text-slate-700">₹{sub.price}</td>
+                                <td className="p-3 text-slate-500">{fmt(sub.start_date)}</td>
+                                <td className="p-3 text-slate-500">{fmt(sub.end_date)}</td>
+                                <td className="p-3">
+                                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                    sub.is_active ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : "bg-slate-100 text-slate-500"
+                                  }`}>
+                                    {sub.is_active ? "Active" : "Expired"}
+                                  </span>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
                     </div>
                   )}
 
+                  {/* Payment Receipts */}
                   {data.payments && data.payments.length > 0 && (
-                    <div className="pt-2">
-                      <h3 className="text-xs font-extrabold text-slate-400 uppercase tracking-wider mb-2">Payment Receipts</h3>
-                      <div className="space-y-2">
-                        {data.payments.map((p, i) => (
-                          <div key={i} className="flex items-center justify-between px-3.5 py-2.5 bg-slate-50 rounded-xl border border-slate-100 text-xs">
-                            <div>
-                              <p className="font-extrabold text-slate-900">₹{p.amount || "0"}</p>
-                              <p className="text-slate-400 text-[11px]">{fmt(p.created_at)} · {p.payment_type || "Razorpay"}</p>
-                            </div>
-                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                              p.status === "success" ? "bg-emerald-100 text-emerald-700" : "bg-rose-100 text-rose-700"
-                            }`}>
-                              {p.status}
-                            </span>
-                          </div>
-                        ))}
+                    <div>
+                      <h3 className="text-xs font-extrabold text-slate-400 uppercase tracking-wider mb-3">Payment Receipts & Transactions ({data.payments.length})</h3>
+                      <div className="overflow-x-auto rounded-2xl border border-slate-200">
+                        <table className="w-full text-left text-xs">
+                          <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold uppercase tracking-wider">
+                            <tr>
+                              <th className="p-3">Payment ID / Order</th>
+                              <th className="p-3">Plan</th>
+                              <th className="p-3">Amount</th>
+                              <th className="p-3">Date</th>
+                              <th className="p-3">Status</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100 bg-white">
+                            {data.payments.map((p, idx) => (
+                              <tr key={idx} className="hover:bg-slate-50/50">
+                                <td className="p-3 font-mono text-slate-700">
+                                  <div className="font-bold">{p.razorpay_payment_id || p.order_id || `#${p.id}`}</div>
+                                  {p.order_id && p.razorpay_payment_id && <div className="text-[10px] text-slate-400">{p.order_id}</div>}
+                                </td>
+                                <td className="p-3 font-medium text-slate-700">{p.plan_name || "Subscription"}</td>
+                                <td className="p-3 font-black text-slate-900">₹{p.amount || 0}</td>
+                                <td className="p-3 text-slate-500">{fmt(p.created_at)}</td>
+                                <td className="p-3">
+                                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                    p.status === "success" ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : "bg-rose-50 text-rose-700 border border-rose-200"
+                                  }`}>
+                                    {p.status}
+                                  </span>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
                       </div>
                     </div>
                   )}
