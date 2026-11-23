@@ -10,13 +10,26 @@ import {
 import { getApprovals, executeApprovalAction } from "../api/approvals";
 import { API_BASE_URL } from "../config";
 
+const CLOUDINARY_CLOUD_NAME = "dkcfeta0f";
+
 function resolveDocUrl(url) {
   if (!url) return null;
-  if (url.startsWith("http://") || url.startsWith("https://") || url.startsWith("data:")) {
-    return url;
+  const str = String(url).trim();
+  if (str.startsWith("http://") || str.startsWith("https://") || str.startsWith("data:")) {
+    return str;
   }
-  const clean = url.startsWith("/") ? url : `/${url}`;
-  return `${API_BASE_URL}${clean}`;
+  let clean = str;
+  while (clean.startsWith("/")) clean = clean.slice(1);
+
+  if (clean.startsWith("media/") || clean.startsWith("nutritionist/")) {
+    const rawExtensions = [".pdf", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx", ".txt", ".csv", ".zip"];
+    const ext = clean.substring(clean.lastIndexOf(".")).toLowerCase();
+    const resourceType = rawExtensions.includes(ext) ? "raw" : "image";
+    const cloudPath = clean.startsWith("media/") ? clean : `media/${clean}`;
+    return `https://res.cloudinary.com/${CLOUDINARY_CLOUD_NAME}/${resourceType}/upload/${cloudPath}`;
+  }
+
+  return `${API_BASE_URL}/${clean}`;
 }
 
 function formatDate(dateStr) {
