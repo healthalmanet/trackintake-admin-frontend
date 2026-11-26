@@ -494,12 +494,12 @@ export default function Settings() {
                 />
                 <div className="space-y-0.5">
                   <span className="text-xs sm:text-sm font-black text-slate-900 block">
-                    Enforce Fixed Consultation Rates for Expert Nutritionists
+                    Enforce Fixed Consultation Rates for Expert Fixed Slots
                   </span>
                   <span className="text-xs text-slate-600 block">
                     {expertFixedPricing
-                      ? "Checked (Fixed): TrackIntake controls and enforces fixed Online and In-Clinic consultation rates across expert specialists."
-                      : "Unchecked (Variable): Consultation rates depend on each individual expert nutritionist (they set their own rates). Check this box to switch to fixed rates."}
+                      ? "Checked (Fixed Enforced): TrackIntake controls and enforces the Online and In-Clinic rates below for all Expert Fixed Price Slots. Variable Case Slots still depend on each nutritionist."
+                      : "Unchecked (Variable / Nutritionist-Controlled): Both Fixed Price Slots and Variable Case Slots depend on each individual expert nutritionist. Check this box to enforce fixed rates on Fixed Price Slots."}
                   </span>
                 </div>
               </label>
