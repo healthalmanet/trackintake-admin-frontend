@@ -22,6 +22,12 @@ export default function Settings() {
   const [autoApply, setAutoApply] = useState(true);
   const [applyImmediately, setApplyImmediately] = useState(true);
 
+  // Expert Consultation Pricing Mode State
+  const [expertFixedPricing, setExpertFixedPricing] = useState(false);
+  const [expertOnlinePrice, setExpertOnlinePrice] = useState(999);
+  const [expertOfflinePrice, setExpertOfflinePrice] = useState(999);
+  const [applyExpertImmediately, setApplyExpertImmediately] = useState(true);
+
   // Response Data
   const [config, setConfig] = useState(null);
   const [metrics, setMetrics] = useState({
@@ -53,6 +59,9 @@ export default function Settings() {
         setInhouseCommission(res.config.platform_commission_percent ?? 5);
         setExpertCommission(res.config.expert_commission_percent ?? 5);
         setAutoApply(res.config.auto_apply_to_all);
+        setExpertFixedPricing(Boolean(res.config.expert_fixed_pricing_enabled));
+        setExpertOnlinePrice(res.config.expert_online_price ?? 999);
+        setExpertOfflinePrice(res.config.expert_offline_price ?? 999);
         setMetrics(res.metrics || {});
         setInhousePractitioners(res.inhouse_practitioners || []);
         setExpertPractitioners(res.expert_practitioners || []);
@@ -97,6 +106,10 @@ export default function Settings() {
         expert_commission_percent: parseFloat(expertCommission),
         auto_apply_to_all: autoApply,
         apply_to_existing: applyImmediately,
+        expert_fixed_pricing_enabled: expertFixedPricing,
+        expert_online_price: parseFloat(expertOnlinePrice || 0),
+        expert_offline_price: parseFloat(expertOfflinePrice || 0),
+        apply_expert_to_existing: false,
       });
 
       if (res.status === "success") {
@@ -117,6 +130,10 @@ export default function Settings() {
       setError("Expert commission cut must be between 0% and 100%.");
       return;
     }
+    if (expertFixedPricing && (Number(expertOnlinePrice) < 0 || Number(expertOfflinePrice) < 0)) {
+      setError("Expert fixed consultation rates cannot be negative.");
+      return;
+    }
 
     setSavingGlobal(true);
     setError("");
@@ -129,11 +146,15 @@ export default function Settings() {
         platform_commission_percent: parseFloat(inhouseCommission),
         expert_commission_percent: parseFloat(expertCommission),
         auto_apply_to_all: autoApply,
-        apply_to_existing: false, // Don't overwrite expert custom rates
+        apply_to_existing: false, // Don't overwrite in-house rates
+        expert_fixed_pricing_enabled: expertFixedPricing,
+        expert_online_price: parseFloat(expertOnlinePrice || 0),
+        expert_offline_price: parseFloat(expertOfflinePrice || 0),
+        apply_expert_to_existing: expertFixedPricing && applyExpertImmediately,
       });
 
       if (res.status === "success") {
-        setSuccessMsg(res.message || "Expert specialist platform commission updated successfully!");
+        setSuccessMsg(res.message || "Expert specialist consultation & commission policy updated successfully!");
         await loadData();
       }
     } catch (err) {
@@ -446,15 +467,90 @@ export default function Settings() {
                   Global Expert Specialists Policy
                 </span>
                 <h2 className="text-base font-black text-slate-900 mt-1">
-                  Expert Specialists Platform Commission Fee Cut
+                  Expert Consultation Pricing Mode & Commission Fee Cut
                 </h2>
               </div>
-              <span className="text-xs text-slate-500 font-medium">
-                Standard platform commission applied to independent specialist bookings
+              <span className={`px-3 py-1 rounded-full text-xs font-bold border ${
+                expertFixedPricing
+                  ? "bg-orange-50 text-orange-700 border-orange-200"
+                  : "bg-emerald-50 text-emerald-700 border-emerald-200"
+              }`}>
+                {expertFixedPricing ? "🔒 Fixed Pricing Enforced" : "🔄 Variable (Nutritionist-Controlled)"}
               </span>
             </div>
 
             <form onSubmit={handleSaveExpert} className="p-4 sm:p-5 space-y-4">
+              {/* Toggle: Enforce Fixed Pricing vs Variable Pricing */}
+              <label className={`flex items-start gap-3 p-4 rounded-xl border cursor-pointer transition select-none ${
+                expertFixedPricing
+                  ? "bg-orange-50/60 border-orange-300"
+                  : "bg-slate-50 border-slate-200 hover:bg-slate-100/70"
+              }`}>
+                <input
+                  type="checkbox"
+                  checked={expertFixedPricing}
+                  onChange={(e) => setExpertFixedPricing(e.target.checked)}
+                  className="mt-0.5 w-4 h-4 text-orange-600 rounded focus:ring-orange-500 cursor-pointer shrink-0"
+                />
+                <div className="space-y-0.5">
+                  <span className="text-xs sm:text-sm font-black text-slate-900 block">
+                    Enforce Fixed Consultation Rates for Expert Nutritionists
+                  </span>
+                  <span className="text-xs text-slate-600 block">
+                    {expertFixedPricing
+                      ? "Checked (Fixed): TrackIntake controls and enforces fixed Online and In-Clinic consultation rates across expert specialists."
+                      : "Unchecked (Variable): Consultation rates depend on each individual expert nutritionist (they set their own rates). Check this box to switch to fixed rates."}
+                  </span>
+                </div>
+              </label>
+
+              {/* Fixed Expert Rates (Only shown when Checked) */}
+              {expertFixedPricing && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 animate-in fade-in">
+                  {/* Expert Online Rate */}
+                  <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-1.5">
+                    <span className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                      <Video size={14} className="text-blue-600" />
+                      Fixed Expert Online Rate (₹)
+                    </span>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-sm">₹</span>
+                      <input
+                        type="number"
+                        step="1"
+                        min="0"
+                        value={expertOnlinePrice}
+                        onChange={(e) => setExpertOnlinePrice(e.target.value)}
+                        required={expertFixedPricing}
+                        className="w-full pl-7 pr-3 py-1.5 bg-white border border-slate-200 rounded-lg text-base font-black text-slate-900 focus:outline-none focus:ring-2 focus:ring-orange-400/20 focus:border-orange-500"
+                      />
+                    </div>
+                    <span className="text-[11px] text-slate-400 font-medium block">Enforced virtual video consultation fee</span>
+                  </div>
+
+                  {/* Expert In-Clinic Rate */}
+                  <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-1.5">
+                    <span className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                      <Building2 size={14} className="text-purple-600" />
+                      Fixed Expert In-Clinic Rate (₹)
+                    </span>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-sm">₹</span>
+                      <input
+                        type="number"
+                        step="1"
+                        min="0"
+                        value={expertOfflinePrice}
+                        onChange={(e) => setExpertOfflinePrice(e.target.value)}
+                        required={expertFixedPricing}
+                        className="w-full pl-7 pr-3 py-1.5 bg-white border border-slate-200 rounded-lg text-base font-black text-slate-900 focus:outline-none focus:ring-2 focus:ring-orange-400/20 focus:border-orange-500"
+                      />
+                    </div>
+                    <span className="text-[11px] text-slate-400 font-medium block">Enforced physical clinic consultation fee</span>
+                  </div>
+                </div>
+              )}
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {/* Expert Platform Commission Setting */}
                 <div className="p-3.5 rounded-xl bg-amber-50/50 border border-amber-200 space-y-2">
@@ -500,29 +596,44 @@ export default function Settings() {
                 <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 flex flex-col justify-between space-y-2">
                   <div>
                     <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">
-                      Autonomous Pricing with Platform Commission
+                      {expertFixedPricing ? "Fixed Rate Policy with Platform Commission" : "Variable Pricing with Platform Commission"}
                     </span>
                     <p className="text-xs text-slate-600 mt-1">
-                      Expert specialists set their own appointment rates. TrackIntake deducts <strong>{expertCommission}%</strong> from online bookings. You can also customize rates or commission for any specific expert below.
+                      {expertFixedPricing
+                        ? <>Fixed rates (Online <strong>₹{expertOnlinePrice}</strong>, In-Clinic <strong>₹{expertOfflinePrice}</strong>) are enforced. TrackIntake deducts <strong>{expertCommission}%</strong> commission per booking.</>
+                        : <>Expert specialists set their own variable appointment rates. TrackIntake deducts <strong>{expertCommission}%</strong> from bookings. You can still customize individual rates below.</>}
                     </p>
                   </div>
                   <div className="flex items-center gap-2 pt-1 border-t border-slate-200 text-xs">
-                    <span className="text-slate-400">On ₹1,000 session:</span>
-                    <span className="font-bold text-amber-700">TrackIntake ₹{((1000 * Number(expertCommission || 0)) / 100).toFixed(0)}</span>
+                    <span className="text-slate-400">On ₹{expertFixedPricing ? (expertOnlinePrice || 1000) : 1000} session:</span>
+                    <span className="font-bold text-amber-700">TrackIntake ₹{(((expertFixedPricing ? Number(expertOnlinePrice || 1000) : 1000) * Number(expertCommission || 0)) / 100).toFixed(0)}</span>
                     <span className="text-slate-300">|</span>
-                    <span className="font-bold text-emerald-700">Expert ₹{(1000 - (1000 * Number(expertCommission || 0)) / 100).toFixed(0)}</span>
+                    <span className="font-bold text-emerald-700">Expert ₹{((expertFixedPricing ? Number(expertOnlinePrice || 1000) : 1000) - ((expertFixedPricing ? Number(expertOnlinePrice || 1000) : 1000) * Number(expertCommission || 0)) / 100).toFixed(0)}</span>
                   </div>
                 </div>
               </div>
 
-              <div className="flex justify-end pt-2 border-t border-slate-100">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2 border-t border-slate-100">
+                <div>
+                  {expertFixedPricing && (
+                    <label className="flex items-center gap-1.5 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={applyExpertImmediately}
+                        onChange={(e) => setApplyExpertImmediately(e.target.checked)}
+                        className="w-3.5 h-3.5 text-orange-500 rounded focus:ring-orange-400 cursor-pointer"
+                      />
+                      <span className="text-xs font-medium text-slate-600">Sync fixed rates to all existing expert specialists</span>
+                    </label>
+                  )}
+                </div>
                 <button
                   type="submit"
                   disabled={savingGlobal}
-                  className="inline-flex items-center justify-center gap-1.5 px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold rounded-xl transition cursor-pointer shadow-xs disabled:opacity-50"
+                  className="inline-flex items-center justify-center gap-1.5 px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold rounded-xl transition cursor-pointer shadow-xs disabled:opacity-50 self-end sm:self-auto"
                 >
                   {savingGlobal ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
-                  Save Expert Commission Policy
+                  Save Expert Policy
                 </button>
               </div>
             </form>
@@ -531,7 +642,9 @@ export default function Settings() {
           {/* Expert Specialists Directory */}
           <PractitionerTable
             title="Expert Specialists Directory"
-            subtitle="Independent specialists with autonomous rates. Click 'Edit' on any specialist to customize their appointment pricing or commission."
+            subtitle={expertFixedPricing
+              ? "Fixed pricing is currently enforced. Click 'Edit' on any specialist to customize individual pricing or commission."
+              : "Variable mode active: specialists set their own rates. Click 'Edit' on any specialist to customize their pricing or commission."}
             practitioners={expertPractitioners}
             search={search}
             setSearch={setSearch}
